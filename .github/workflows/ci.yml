@@ -1,0 +1,90 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-fast:
+    runs-on: macos-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install .[dev]
+      - name: Run fast test suite
+        run: |
+          make test.fast
+
+  test-full:
+    runs-on: macos-latest
+    env:
+      PYTHON: "3.11"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install .[dev]
+      - name: Generate coverage reports
+        run: |
+          make test.coverage
+      - name: Upload unit coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./unit.coverage.xml
+          flags: unit
+          verbose: false
+          fail_ci_if_error: false
+      - name: Upload integration coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./integration.coverage.xml
+          flags: integration
+          verbose: false
+          fail_ci_if_error: false
+
+  docs:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.11
+      - name: Install documentation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pipenv
+      - name: Build docs
+        run: |
+          cd docs
+          pipenv install || true
+          pipenv run pip install sphinx sphinx_rtd_theme Pygments
+          pipenv run sphinx-build -b html . _build/html
+      - name: Deploy docs
+        uses: JamesIves/github-pages-deploy-action@releases/v3
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: docs/_build/html
