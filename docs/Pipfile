@@ -3,12 +3,16 @@ name = "pypi"
 url = "https://pypi.org/simple"
 verify_ssl = true
 
+[requires]
+python_version = "3.11"
+
 [packages]
 sphinx = "*"
 sphinx-rtd-theme = "*"
-Pygments = "*"
+sphinx-autobuild = "*"
 
 [dev-packages]
 
-[requires]
-python_version = "3.11"
+[scripts]
+build = "sphinx-build -b html . _build/html"
+serve = "sphinx-autobuild . _build/html"

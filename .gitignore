@@ -81,5 +81,14 @@ venv.bak/
 *.log
 *.tmp
 
+# Documentation builds
+docs/_build/
+
 # direnv
 .envrc
+
+AGENTS.md
+data_large
+synthetic_data
+synthetic_data_extreme
+synthetic_data_hard

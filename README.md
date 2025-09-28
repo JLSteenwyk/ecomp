@@ -17,20 +17,21 @@ pip install .[dev]
 > dev tools (`pytest`, `ruff`, `black`, `mypy`, etc.) are provisioned manually.
 
 ## CLI Usage
+# The CLI is available as both `ecomp` and the shorter alias `ec`.
 ```bash
 # Compress an alignment (writes example.ecomp + metadata JSON)
-ecomp compress example.fasta
+ec compress example.fasta
 
-# Compress alignment + tree bundle (writes example.ecbt + metadata)
-ecomp compress example.fasta example.tree
+# Optionally supply a tree to guide ordering (tree is not stored)
+ec compress example.fasta --tree example.tree
 
 # Decompress (auto-detects codec from metadata)
-ecomp decompress example.ecbt --alignment-output restored.fasta --tree-output restored.tree
+ec decompress example.ecomp --alignment-output restored.fasta
 
 # Inspect metadata (JSON or short summary)
-ecomp inspect example.ecomp --summary
+ec inspect example.ecomp --summary
 ```
-The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment_with_tree`, `decompress_alignment_with_tree`).
+The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment`, `decompress_alignment`).
 
 ## Development Workflow
 - Run the fast test suite (unit + non-slow integration):
@@ -62,16 +63,15 @@ The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompr
 
 ## Benchmarking
 Use `scripts/compare_compressors.py` to compare eComp against `gzip`, `bzip2`,
-`xz`, and the experimental `phylo-bundle` codec (alignment + Newick tree when
-available):
+and `xz`:
 ```bash
 python scripts/compare_compressors.py data/fixtures/small_orthogroup.fasta \
-  --codecs ecomp phylo-bundle gzip bzip2 xz --output benchmark.json
+  --codecs ecomp gzip bzip2 xz --output benchmark.json
 ```
 If a companion tree file (e.g., `small_orthogroup.tree`) exists alongside an
-alignment, the script will automatically include the bundled codec in the
-results and compute ratios using the combined alignment + tree size.
-The script emits compression ratios and runtime metrics in JSON format.
+alignment, the script automatically feeds it into eComp to guide sequence
+ordering.  The script emits compression ratios and runtime metrics in JSON
+format.
 
 Additional roadmap milestones and contribution practices are documented in
 `ECOMP_CODEBASE_PLAN.md` and `AGENTS.md`.

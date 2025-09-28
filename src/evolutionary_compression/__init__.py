@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Tuple
 
 from .compression.pipeline import CompressedAlignment, compress_alignment, decompress_alignment
-from .compression.phylo_bundle import compress_alignment_with_tree, decompress_alignment_with_tree
 from .config import DEFAULT_OUTPUT_FORMAT, METADATA_SUFFIX
 from .io import AlignmentFrame, read_alignment, write_alignment
 from .storage import derive_metadata_path, read_metadata, read_payload, write_metadata, write_payload
@@ -20,8 +19,6 @@ __all__ = [
     "decompress_file",
     "compress_alignment",
     "decompress_alignment",
-    "compress_alignment_with_tree",
-    "decompress_alignment_with_tree",
     "read_alignment",
     "write_alignment",
     "alignment_checksum",

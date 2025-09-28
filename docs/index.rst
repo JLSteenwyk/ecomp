@@ -1,17 +1,21 @@
 Evolutionary Compression Documentation
 ======================================
 
-Welcome to the developer documentation for |project|. This site mirrors the
-ClipKIT documentation layout so contributors familiar with that project can be
-productive immediately. Use the navigation menu or the table of contents below
-to find the information you need.
+Welcome to the eComp documentation. This site mirrors the structure of the
+PhyKIT docs so users familiar with that project can navigate quickly. Use the
+sections below to learn about the project, explore usage examples, or dive into
+API and developer notes.
 
 .. toctree::
    :maxdepth: 2
    :caption: Table of Contents
 
-   overview
-   architecture
-   cli
-   development
-   benchmarks
+   about/overview
+   usage/quickstart
+   usage/benchmarking
+   usage/api
+   tutorials/workflows
+   frequently_asked_questions/index
+   change_log/index
+   other_software/index
+   data/index

@@ -9,10 +9,6 @@ from pathlib import Path
 from typing import Iterable
 
 from .compression.pipeline import compress_alignment, decompress_alignment
-from .compression.phylo_bundle import (
-    compress_alignment_with_tree,
-    decompress_alignment_with_tree,
-)
 from .config import DEFAULT_OUTPUT_FORMAT
 from .diagnostics.checksums import alignment_checksum
 from .io import read_alignment, write_alignment
@@ -25,8 +21,6 @@ from .storage import (
 )
 
 ALIGNMENT_SUFFIX = ".ecomp"
-BUNDLE_SUFFIX = ".ecbt"
-CODEC_CHOICES = ("auto", "alignment", "phylo")
 
 
 # ---------------------------------------------------------------------------
@@ -44,15 +38,10 @@ def _add_compress_arguments(subparsers: argparse._SubParsersAction[argparse.Argu
         help="Input alignment in FASTA/PHYLIP format",
     )
     parser.add_argument(
-        "tree",
-        nargs="?",
-        help="Optional Newick tree; enables phylogenetic bundle compression",
-    )
-    parser.add_argument(
         "-o",
         "--output",
         dest="output",
-        help="Destination archive path (default: alignment stem + .ecomp or .ecbt)",
+        help="Destination archive path (default: alignment stem + .ecomp)",
     )
     parser.add_argument(
         "-m",
@@ -67,15 +56,9 @@ def _add_compress_arguments(subparsers: argparse._SubParsersAction[argparse.Argu
         help="Alignment format hint passed to the parser",
     )
     parser.add_argument(
-        "--codec",
-        choices=CODEC_CHOICES,
-        default="auto",
-        help="Compression strategy: auto-select, alignment-only, or phylo bundle",
-    )
-    parser.add_argument(
-        "--bundle-suffix",
-        default=BUNDLE_SUFFIX,
-        help=f"Suffix when writing phylo bundles (default: {BUNDLE_SUFFIX})",
+        "--tree",
+        dest="tree_path",
+        help="Optional Newick tree used only to guide sequence ordering",
     )
     parser.add_argument(
         "--stats",
@@ -104,12 +87,6 @@ def _add_decompress_arguments(
         "--alignment-output",
         dest="alignment_output",
         help="Alignment output path (default: archive stem + .fasta)",
-    )
-    parser.add_argument(
-        "-t",
-        "--tree-output",
-        dest="tree_output",
-        help="Tree output path when decompressing a phylo bundle (default: archive stem + .tree)",
     )
     parser.add_argument(
         "-F",
@@ -151,7 +128,7 @@ def _add_inspect_arguments(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ecomp",
-        description="Evolutionary compression toolkit for alignments and phylogenies",
+        description="Evolutionary compression toolkit for multiple sequence alignments",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_compress_arguments(subparsers)
@@ -170,33 +147,21 @@ def _cmd_compress(args: argparse.Namespace) -> int:
     if not alignment_path.exists():
         raise SystemExit(f"Alignment not found: {alignment_path}")
 
-    tree_path = Path(args.tree).expanduser().resolve() if args.tree else None
-    codec_mode = args.codec
-    if codec_mode == "auto":
-        codec_mode = "phylo" if tree_path is not None else "alignment"
-
-    if codec_mode == "phylo" and tree_path is None:
-        raise SystemExit("Phylo codec requested but no tree file provided")
-
+    tree_path = Path(args.tree_path).expanduser().resolve() if args.tree_path else None
     if tree_path and not tree_path.exists():
         raise SystemExit(f"Tree file not found: {tree_path}")
 
     frame = read_alignment(alignment_path, fmt=args.alignment_format)
+    if tree_path is not None:
+        try:
+            frame.metadata["tree_newick"] = tree_path.read_text()
+        except OSError as exc:
+            raise SystemExit(f"Failed to read tree file: {tree_path}") from exc
 
-    if codec_mode == "phylo":
-        newick = tree_path.read_text()
-        payload, metadata = compress_alignment_with_tree(frame, newick)
-        suffix = _normalize_suffix(args.bundle_suffix)
-    else:
-        compressed = compress_alignment(frame)
-        payload = compressed.payload
-        metadata = compressed.metadata
-        suffix = ALIGNMENT_SUFFIX
-        if tree_path is not None:
-            print(
-                "[warning] Tree provided but alignment codec was requested; tree will be ignored",
-                file=sys.stderr,
-            )
+    compressed = compress_alignment(frame)
+    payload = compressed.payload
+    metadata = compressed.metadata
+    suffix = ALIGNMENT_SUFFIX
 
     output_path = Path(args.output).expanduser().resolve() if args.output else alignment_path.with_suffix(suffix)
     metadata_path = (
@@ -212,13 +177,12 @@ def _cmd_compress(args: argparse.Namespace) -> int:
     print(f"Metadata recorded at {metadata_path}")
 
     if args.stats:
-        original_size = _total_input_size(alignment_path, tree_path)
+        original_size = alignment_path.stat().st_size
         compressed_size = output_path.stat().st_size
         ratio = (original_size / compressed_size) if compressed_size else float("inf")
-        label = "alignment+tree" if codec_mode == "phylo" else "alignment"
         print(
-            f"Stats: codec={metadata.get('codec', 'ecomp')} dataset={label} "
-            f"original={original_size}B compressed={compressed_size}B ratio={ratio:.3f}x"
+            f"Stats: codec={metadata.get('codec', 'ecomp')} original={original_size}B "
+            f"compressed={compressed_size}B ratio={ratio:.3f}x"
         )
 
     return 0
@@ -237,43 +201,18 @@ def _cmd_decompress(args: argparse.Namespace) -> int:
     metadata = read_metadata(metadata_path)
     payload = read_payload(archive_path)
 
-    codec = metadata.get("codec", "ecomp")
-    if codec == "phylo-bundle":
-        frame, newick = decompress_alignment_with_tree(payload, metadata)
-        if not args.no_checksum:
-            _verify_checksum(frame.sequences, metadata)
+    frame = decompress_alignment(payload, metadata)
+    if not args.no_checksum:
+        _verify_checksum(frame.sequences, metadata)
 
-        alignment_output = (
-            Path(args.alignment_output).expanduser().resolve()
-            if args.alignment_output
-            else archive_path.with_suffix(f".{args.alignment_format}")
-        )
-        alignment_output.parent.mkdir(parents=True, exist_ok=True)
-        write_alignment(frame, alignment_output, fmt=args.alignment_format)
-
-        tree_output = (
-            Path(args.tree_output).expanduser().resolve()
-            if args.tree_output
-            else archive_path.with_suffix(".tree")
-        )
-        tree_output.parent.mkdir(parents=True, exist_ok=True)
-        tree_output.write_text(newick)
-
-        print(f"Wrote alignment to {alignment_output}")
-        print(f"Wrote tree to {tree_output}")
-        return 0
-
-    # default: standard alignment archive handled by helper
-    from . import decompress_file as _legacy_decompress_file  # local import to avoid cycle
-
-    output_path = _legacy_decompress_file(
-        archive_path,
-        output_path=args.alignment_output,
-        metadata_path=metadata_path,
-        output_format=args.alignment_format,
-        validate_checksum=not args.no_checksum,
+    alignment_output = (
+        Path(args.alignment_output).expanduser().resolve()
+        if args.alignment_output
+        else archive_path.with_suffix(f".{args.alignment_format}")
     )
-    print(f"Wrote alignment to {output_path}")
+    alignment_output.parent.mkdir(parents=True, exist_ok=True)
+    write_alignment(frame, alignment_output, fmt=args.alignment_format)
+    print(f"Wrote alignment to {alignment_output}")
     return 0
 
 
@@ -295,35 +234,11 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
         print(f"Sequences: {num_sequences}")
         print(f"Alignment columns: {alignment_length}")
         print(f"Payload encoding: {payload_encoding}")
-        if codec == "phylo-bundle":
-            leaf_count = len(metadata.get("sequence_ids", []))
-            print(f"Bundle leaf count: {leaf_count}")
         return 0
 
     json.dump(metadata, sys.stdout, indent=2, sort_keys=True)
     sys.stdout.write("\n")
     return 0
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _normalize_suffix(suffix: str) -> str:
-    suffix = suffix.strip()
-    if not suffix:
-        return BUNDLE_SUFFIX
-    if not suffix.startswith("."):
-        suffix = f".{suffix}"
-    return suffix
-
-
-def _total_input_size(alignment_path: Path, tree_path: Path | None) -> int:
-    total = alignment_path.stat().st_size
-    if tree_path is not None:
-        total += tree_path.stat().st_size
-    return total
 
 
 def _verify_checksum(sequences: Iterable[str], metadata: dict[str, object]) -> None:

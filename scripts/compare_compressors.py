@@ -20,10 +20,8 @@ if str(REPO_SRC) not in sys.path:
     sys.path.insert(0, str(REPO_SRC))
 
 from evolutionary_compression import read_alignment
-from evolutionary_compression.compression.phylo_bundle import (
-    compress_alignment_with_tree,
-    decompress_alignment_with_tree,
-)
+from evolutionary_compression.compression.pipeline import compress_alignment, decompress_alignment
+from evolutionary_compression.io import write_alignment
 from evolutionary_compression.storage import (
     read_metadata,
     read_payload,
@@ -31,7 +29,7 @@ from evolutionary_compression.storage import (
     write_payload,
 )
 
-TREE_SUFFIXES = (".tree", ".nwk", ".newick")
+TREE_SUFFIXES = (".tree", ".nwk", ".newick", ".tre")
 
 REQUIRED_EXTERNAL = {
     "gzip": {"compress": ["gzip", "-k"], "decompress": ["gzip", "-dk"]},
@@ -74,7 +72,7 @@ def run_command(cmd: list[str], cwd: Path | None = None) -> float:
     )
     return time.perf_counter() - start
 
-def benchmark_ecomp(
+def benchmark_ecomp_cli(
     input_path: Path, workdir: Path
 ) -> BenchmarkResult:
     ecomp_path = workdir / (input_path.name + ".ecomp")
@@ -138,54 +136,6 @@ def _find_tree_path(input_path: Path) -> Path | None:
                 return candidate
     return None
 
-def benchmark_phylo_bundle(input_path: Path, workdir: Path) -> BenchmarkResult:
-    tree_path = _find_tree_path(input_path)
-    if tree_path is None:
-        original_size = input_path.stat().st_size
-        return BenchmarkResult(
-            codec="phylo-bundle",
-            original_size=original_size,
-            compressed_size=0,
-            compression_ratio=0.0,
-            compress_seconds=0.0,
-            decompress_seconds=0.0,
-            notes="tree_not_found",
-        )
-
-    bundle_path = workdir / (input_path.stem + ".ecbt")
-    metadata_path = bundle_path.with_suffix(".json")
-
-    frame = read_alignment(input_path)
-    tree_text = tree_path.read_text()
-
-    start = time.perf_counter()
-    payload, metadata = compress_alignment_with_tree(frame, tree_text)
-    compress_seconds = time.perf_counter() - start
-
-    write_payload(bundle_path, payload)
-    write_metadata(metadata_path, metadata)
-
-    start = time.perf_counter()
-    restored_frame, _restored_newick = decompress_alignment_with_tree(payload, metadata)
-    decompress_seconds = time.perf_counter() - start
-
-    original_size = input_path.stat().st_size + tree_path.stat().st_size
-    compressed_size = bundle_path.stat().st_size
-    ratio = original_size / compressed_size if compressed_size else 0.0
-    note = f"tree={tree_path.name}"
-
-    if restored_frame.sequences != frame.sequences:
-        note = "mismatch"
-
-    return BenchmarkResult(
-        codec="phylo-bundle",
-        original_size=original_size,
-        compressed_size=compressed_size,
-        compression_ratio=ratio,
-        compress_seconds=compress_seconds,
-        decompress_seconds=decompress_seconds,
-        notes=note,
-    )
 
 def benchmark_external(codec: str, input_path: Path, workdir: Path) -> BenchmarkResult:
     mapping = REQUIRED_EXTERNAL[codec]
@@ -241,16 +191,69 @@ def benchmark_external(codec: str, input_path: Path, workdir: Path) -> Benchmark
         decompress_seconds=decompress_seconds,
     )
 
-def run_benchmarks(input_paths: Iterable[Path], codecs: list[str]) -> list[BenchmarkResult]:
+def benchmark_ecomp_internal(input_path: Path, workdir: Path) -> BenchmarkResult:
+    start = time.perf_counter()
+    frame = read_alignment(input_path)
+    tree_path = _find_tree_path(input_path)
+    if tree_path is not None:
+        try:
+            frame.metadata["tree_newick"] = tree_path.read_text()
+        except OSError:
+            frame.metadata.pop("tree_newick", None)
+    compressed = compress_alignment(frame)
+    archive_path = workdir / (input_path.name + ".ecomp")
+    metadata_path = archive_path.with_suffix(".json")
+    write_payload(archive_path, compressed.payload)
+    write_metadata(metadata_path, compressed.metadata)
+    compress_seconds = time.perf_counter() - start
+
+    start = time.perf_counter()
+    payload = read_payload(archive_path)
+    metadata = read_metadata(metadata_path)
+    restored = decompress_alignment(payload, metadata)
+    restored_path = workdir / (input_path.stem + ".restored.fasta")
+    write_alignment(restored, restored_path, fmt="fasta")
+    decompress_seconds = time.perf_counter() - start
+
+    original_size = input_path.stat().st_size
+    compressed_size = archive_path.stat().st_size if archive_path.exists() else 0
+    ratio = original_size / compressed_size if compressed_size else float("inf")
+
+    metadata_bytes = metadata_path.stat().st_size if metadata_path.exists() else 0
+    info: list[str] = []
+    if metadata_bytes:
+        info.append(f"metadata_bytes={metadata_bytes}")
+    if compressed_size:
+        info.append(f"payload_bytes={compressed_size}")
+
+    notes = "mismatch" if restored.sequences != frame.sequences else ""
+    if info:
+        notes = f"{notes}," + ",".join(info) if notes else ",".join(info)
+
+    return BenchmarkResult(
+        codec="ecomp",
+        original_size=original_size,
+        compressed_size=compressed_size,
+        compression_ratio=ratio,
+        compress_seconds=compress_seconds,
+        decompress_seconds=decompress_seconds,
+        notes=notes,
+    )
+
+
+def run_benchmarks(
+    input_paths: Iterable[Path], codecs: list[str], runner: str
+) -> list[BenchmarkResult]:
     results: list[BenchmarkResult] = []
     with tempfile.TemporaryDirectory() as tmpdir:
         workdir = Path(tmpdir)
         for input_path in input_paths:
             for codec in codecs:
                 if codec == "ecomp":
-                    results.append(benchmark_ecomp(input_path, workdir))
-                elif codec == "phylo-bundle":
-                    results.append(benchmark_phylo_bundle(input_path, workdir))
+                    if runner == "internal":
+                        results.append(benchmark_ecomp_internal(input_path, workdir))
+                    else:
+                        results.append(benchmark_ecomp_cli(input_path, workdir))
                 elif codec in REQUIRED_EXTERNAL:
                     results.append(benchmark_external(codec, input_path, workdir))
                 else:
@@ -273,13 +276,19 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--codecs",
         nargs="+",
-        default=["ecomp", "phylo-bundle", "gzip", "bzip2", "xz"],
+        default=["ecomp", "gzip", "bzip2", "xz"],
         help="Codec names to benchmark",
     )
     parser.add_argument(
         "--output",
         type=Path,
         help="Optional JSON output path to persist benchmark results",
+    )
+    parser.add_argument(
+        "--runner",
+        choices=["cli", "internal"],
+        default="cli",
+        help="How to invoke the ecomp codec (default: cli)",
     )
     return parser.parse_args(argv)
 
@@ -290,7 +299,7 @@ def main(argv: list[str] | None = None) -> int:
         if not path.exists():
             raise SystemExit(f"Input path not found: {path}")
 
-    results = run_benchmarks(input_paths, args.codecs)
+    results = run_benchmarks(input_paths, args.codecs, runner=args.runner)
     payload = [asdict(result) for result in results]
 
     if args.output:

@@ -1,8 +1,4 @@
->taxon_1
+>tax1
 ACGTACGT
->taxon_2
-ACGTACGA
->taxon_3
+>tax2
 ACGTTCGT
->taxon_4
-ACGTTCGA

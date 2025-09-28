@@ -1,17 +1,13 @@
-# Minimal Sphinx makefile inspired by ClipKIT docs
+# Minimal Sphinx Makefile (mirrors PhyKIT layout)
 
-SPHINXOPTS    =
-SPHINXBUILD   = sphinx-build
-SOURCEDIR     = .
-BUILDDIR      = _build
+SPHINXBUILD ?= sphinx-build
+SOURCEDIR = .
+BUILDDIR = _build
 
-.PHONY: help clean html
-
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-
-clean:
-	rm -rf "$(BUILDDIR)"
+.PHONY: html clean
 
 html:
-	@$(SPHINXBUILD) -M html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	$(SPHINXBUILD) -b html $(SOURCEDIR) $(BUILDDIR)/html
+
+clean:
+	rm -rf $(BUILDDIR)

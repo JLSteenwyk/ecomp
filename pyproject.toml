@@ -29,6 +29,7 @@ classifiers = [
 
 [project.scripts]
 ecomp = "evolutionary_compression.cli:main"
+ec = "evolutionary_compression.cli:main"
 
 [tool.black]
 line-length = 88
