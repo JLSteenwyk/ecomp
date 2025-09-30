@@ -18,4 +18,3 @@ API and developer notes.
    frequently_asked_questions/index
    change_log/index
    other_software/index
-   data/index

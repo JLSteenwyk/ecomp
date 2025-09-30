@@ -34,6 +34,11 @@ convenience):
     # Supply a tree only for sequence ordering (tree is NOT stored)
     ec compress data/alignment.fasta --tree data/alignment.fasta.tre
 
+eComp now checks a few alignment heuristics (gap density, relative composition
+variability, and pairwise identity spread) before using the tree ordering.  If
+the data look noisy, it falls back to the similarity-based reorder automatically;
+set ``ECOMP_SEQUENCE_ORDER=tree`` to force tree usage when you know it is safe.
+
     # Decompress back to FASTA (auto-picks .fasta extension)
     ec decompress data/alignment.ecomp
 

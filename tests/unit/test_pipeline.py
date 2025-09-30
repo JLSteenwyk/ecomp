@@ -1,10 +1,55 @@
+import os
 import random
+import lzma
+
+import math
 
 import pytest
 
 from evolutionary_compression.io import alignment_from_sequences
 from evolutionary_compression.compression import pipeline
 from evolutionary_compression.compression.pipeline import compress_alignment, decompress_alignment
+from evolutionary_compression.diagnostics.checksums import alignment_checksum
+from evolutionary_compression.compression.consensus import collect_column_profiles
+from evolutionary_compression.compression.rle import collect_run_length_blocks
+from evolutionary_compression.compression.encoding import encode_blocks
+
+
+def _build_raw_payload_and_metadata(frame):
+    column_profiles = collect_column_profiles(frame)
+    alphabet = frame.alphabet
+    symbol_lookup = {symbol: index for index, symbol in enumerate(alphabet)}
+    bits_per_symbol = max(1, math.ceil(math.log2(max(len(alphabet), 1))))
+    run_length_blocks = collect_run_length_blocks(
+        column_profiles, frame.num_sequences, symbol_lookup, bits_per_symbol
+    )
+    bitmask_bytes = (frame.num_sequences + 7) // 8
+    run_length_payload = encode_blocks(
+        run_length_blocks, bitmask_bytes, bits_per_symbol, alphabet
+    )
+    seq_block = pipeline._encode_sequence_ids(frame.ids)
+    raw_payload = seq_block + run_length_payload
+    deviation_columns = sum(1 for block in column_profiles if block.deviations)
+    metadata = {
+        "format_version": pipeline.FORMAT_VERSION,
+        "codec": "ecomp",
+        "num_sequences": frame.num_sequences,
+        "alignment_length": frame.alignment_length,
+        "alphabet": frame.alphabet,
+        "source_format": frame.metadata.get("source_format", "fasta"),
+        "checksum_sha256": alignment_checksum(frame.sequences),
+        "run_length_blocks": len(run_length_blocks),
+        "max_run_length": max((block.run_length for block in run_length_blocks), default=0),
+        "columns_with_deviations": deviation_columns,
+        "bitmask_bytes": bitmask_bytes,
+        "bits_per_symbol": bits_per_symbol,
+        "payload_encoding": "raw",
+        "payload_encoded_bytes": len(raw_payload),
+        "payload_raw_bytes": len(raw_payload),
+        "sequence_id_codec": "inline",
+        "ordering_strategy": "baseline",
+    }
+    return raw_payload, metadata
 
 
 def test_compress_decompress_preserves_sequences():
@@ -99,8 +144,10 @@ def test_similarity_order_prefers_nonbaseline():
     assert permutation != list(range(len(ids)))
 
     compressed = compress_alignment(frame)
-    if compressed.metadata.get("sequence_permutation") is not None:
-        assert compressed.metadata["sequence_permutation"] == permutation
+    perm_meta = compressed.metadata.get("sequence_permutation")
+    if perm_meta is not None:
+        assert perm_meta.get("encoding") == "payload"
+        assert perm_meta.get("length", 0) > 0
     assert compressed.metadata.get("ordering_strategy", "").startswith("auto-")
 
     restored = decompress_alignment(compressed.payload, compressed.metadata)
@@ -135,6 +182,27 @@ def test_tree_guided_sequence_ordering():
     assert restored.sequences == sequences
 
 
+def test_tree_guided_order_skipped_when_gap_heavy():
+    ids = ["tax1", "tax2", "tax3", "tax4"]
+    sequences = [
+        "-A-A-A",
+        "A-A-A-",
+        "-A-A-A",
+        "A-A-A-",
+    ]
+    newick = "((tax1:0.1,tax2:0.1):0.2,(tax3:0.1,tax4:0.1):0.2);"
+    frame = alignment_from_sequences(
+        ids=ids,
+        sequences=sequences,
+        metadata={"tree_newick": newick},
+    )
+
+    compressed = compress_alignment(frame)
+    assert compressed.metadata.get("ordering_strategy") != "tree"
+    restored = decompress_alignment(compressed.payload, compressed.metadata)
+    assert restored.sequences == sequences
+
+
 def test_decompress_alignment_raises_on_column_length_mismatch():
     frame = alignment_from_sequences(
         ids=["s1", "s2"],
@@ -147,3 +215,65 @@ def test_decompress_alignment_raises_on_column_length_mismatch():
     with pytest.raises(ValueError):
         decompress_alignment(compressed.payload, bad_metadata)
 
+
+def test_decompress_alignment_requires_bits_per_symbol_without_alphabet():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "AAAT"])
+    raw_payload, metadata = _build_raw_payload_and_metadata(frame)
+    bad_meta = dict(metadata)
+    bad_meta.pop("bits_per_symbol", None)
+    bad_meta["alphabet"] = []
+    with pytest.raises(ValueError):
+        decompress_alignment(raw_payload, bad_meta)
+
+
+def test_decompress_alignment_rejects_unknown_payload_encoding():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "AAAT"])
+    raw_payload, metadata = _build_raw_payload_and_metadata(frame)
+    bad_meta = dict(metadata)
+    bad_meta["payload_encoding"] = "unknown"
+    with pytest.raises(ValueError):
+        decompress_alignment(raw_payload, bad_meta)
+
+
+def test_decompress_alignment_supports_xz_encoding():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "AAAT"])
+    raw_payload, metadata = _build_raw_payload_and_metadata(frame)
+    metadata_xz = dict(metadata)
+    payload_xz = lzma.compress(raw_payload)
+    metadata_xz["payload_encoding"] = "xz"
+    metadata_xz["payload_encoded_bytes"] = len(payload_xz)
+    restored = decompress_alignment(payload_xz, metadata_xz)
+    assert restored.sequences == frame.sequences
+    assert restored.ids == frame.ids
+
+
+def test_decompress_alignment_handles_unknown_fallback_type():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "AAAT"])
+    raw_payload, metadata = _build_raw_payload_and_metadata(frame)
+    bad_meta = dict(metadata)
+    bad_meta["fallback"] = {"type": "zip"}
+    with pytest.raises(ValueError):
+        decompress_alignment(raw_payload, bad_meta)
+
+
+def test_decompress_alignment_raises_when_columns_exceed_expected():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "AAAT"])
+    raw_payload, metadata = _build_raw_payload_and_metadata(frame)
+    bad_meta = dict(metadata)
+    bad_meta["alignment_length"] = metadata["alignment_length"] - 1
+    with pytest.raises(ValueError):
+        decompress_alignment(raw_payload, bad_meta)
+
+
+def test_choose_order_respects_env_override(monkeypatch):
+    monkeypatch.setenv("ECOMP_SEQUENCE_ORDER", "mst")
+    ids = ["s1", "s2", "s3"]
+    sequences = [
+        "AAAA",
+        "TTTT",
+        "AAAT",
+    ]
+    frame = alignment_from_sequences(ids=ids, sequences=sequences)
+    _, permutation, label = pipeline._compute_similarity_order(frame)  # type: ignore[attr-defined]
+    assert label == "mst"
+    assert len(permutation) == len(ids)

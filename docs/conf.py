@@ -27,9 +27,9 @@ master_doc = "index"
 
 # -- Options for HTML output -------------------------------------------------
 html_theme = "sphinx_rtd_theme"
-html_logo = "_static/img/logo.png"
-html_favicon = "_static/img/favicon.ico"
-html_static_path = ["_static"]
+html_logo = None
+html_favicon = None
+html_static_path = []
 html_show_sourcelink = False
 html_theme_options = {
     "body_max_width": "900px",

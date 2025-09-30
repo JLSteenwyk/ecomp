@@ -9,7 +9,7 @@ help:
 	@echo "  test           - run full unit + integration test matrix"
 	@echo "  test.coverage  - generate coverage XML reports (unit + integration)"
 	@echo "  docs           - build documentation site"
-	@echo "  bench          - run benchmark helper (requires compressors)"
+	@echo "  bench          - print CLI benchmarking tips"
 
 install:
 	python -m pip install --upgrade pip
@@ -46,7 +46,9 @@ coverage.integration:
 	python -m pytest --cov=evolutionary_compression --cov-report=xml:integration.coverage.xml -m "integration"
 
 bench:
-	python scripts/compare_compressors.py data/fixtures/small_orthogroup.fasta
+	@echo "Run CLI benchmarks with:"
+	@echo "  /usr/bin/time -p ecomp compress data/fixtures/small_phylo.fasta --output out.ecomp"
+	@echo "Compare the timing and archive sizes against gzip, bzip2, or xz as needed."
 
 docs:
 	python -m pip install --upgrade pip

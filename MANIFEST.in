@@ -1,0 +1,13 @@
+include README.md
+include LICENSE
+graft src
+prune docs
+prune data
+prune data_large
+prune example_data
+prune synthetic_data
+prune synthetic_data_extreme
+prune synthetic_data_hard
+prune venv
+global-exclude *.py[cod]
+global-exclude __pycache__

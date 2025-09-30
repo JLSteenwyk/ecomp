@@ -52,10 +52,13 @@ Tree-guided ordering hook
 -------------------------
 
 If ``frame.metadata`` contains ``tree_newick`` (a Newick string whose leaf labels
-match the sequence IDs) the compressor will derive a depth-first ordering guided by
-that tree before emitting blocks.  The tree is used purely for ordering—it is not
-persisted in the metadata—so archives stay small while still benefiting from the
-improved sequence layout.
+match the sequence IDs) the compressor will try to derive a depth-first ordering
+guided by that tree before emitting blocks.  For noisy alignments—lots of gaps,
+high composition heterogeneity, or very low pairwise identity—the optimizer now
+skips the tree and falls back to the similarity-based order.  Set the environment
+variable ``ECOMP_SEQUENCE_ORDER=tree`` if you want to force tree usage regardless
+of those heuristics.  The tree itself is never persisted; ordering hints do not
+inflate archive sizes.
 
 Error handling
 --------------

@@ -10,9 +10,17 @@ from evolutionary_compression.compression.encoding import (
     DecodingError,
     EncodingError,
     _build_dictionary,
+    _decode_bitmask,
+    _decode_residue_stream,
+    _canonical_code_maps,
+    _pack_huffman_codes,
+    _pack_codes,
+    _unpack_codes,
     _encode_char,
+    _encode_bitmask,
     _popcount,
     _trim_bitmask,
+    _write_varint,
     decode_blocks,
     encode_blocks,
 )
@@ -94,6 +102,56 @@ def test_decode_blocks_detects_truncated_literal():
         decode_blocks(bytes(payload), bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
 
 
+def test_decode_blocks_errors_on_truncated_consensus_table():
+    payload = bytes([1, ord("A")])
+    with pytest.raises(DecodingError):
+        decode_blocks(payload, bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
+
+
+def test_decode_blocks_errors_on_missing_block_count():
+    payload = bytes([0, 0])
+    with pytest.raises(DecodingError):
+        decode_blocks(payload, bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
+
+
+def test_decode_blocks_errors_on_dictionary_truncation():
+    payload = bytearray()
+    payload.append(0)
+    payload.append(1)
+    payload.append(ord("A"))
+    payload.append(0)
+    payload.append(1)
+    payload.append(1)
+    payload.extend(b"\x01")
+    with pytest.raises(DecodingError):
+        decode_blocks(bytes(payload), bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
+
+
+def test_decode_blocks_errors_on_truncated_consensus_table():
+    payload = bytes([1, ord("A")])  # table count followed by incomplete entry
+    with pytest.raises(DecodingError):
+        decode_blocks(payload, bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
+
+
+def test_decode_blocks_errors_on_missing_block_count():
+    payload = bytes([0, 0])  # no consensus tables, no dictionary, but missing block count
+    with pytest.raises(DecodingError):
+        decode_blocks(payload, bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
+
+
+def test_decode_blocks_errors_on_dictionary_truncation():
+    payload = bytearray()
+    payload.append(0)  # consensus tables
+    payload.append(1)  # dictionary count
+    payload.append(ord("A"))  # consensus
+    payload.append(0)  # mode
+    payload.append(1)  # deviation count (varint)
+    payload.append(1)  # mask length (varint)
+    payload.extend(b"\x01")  # mask payload but missing residues length
+    with pytest.raises(DecodingError):
+        decode_blocks(bytes(payload), bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"])
+
+
 def test_trim_bitmask_and_popcount_helpers():
     mask = b"\xff\x00\x10\x00\x00"
     trimmed, length = _trim_bitmask(mask)
@@ -151,3 +209,63 @@ def test_huffman_residue_encoding_header():
     assert mode in {0, 1}
     decoded = decode_blocks(payload, bitmask_bytes=bitmask_bytes, bits_per_symbol=bits_per_symbol, alphabet=alphabet)
     assert decoded == blocks
+
+
+def test_decode_residue_stream_missing_model_raises():
+    bitmask = bytes([0b00000001])
+    alphabet_lookup = {"A": 0}
+    with pytest.raises(DecodingError):
+        _decode_residue_stream("A", bitmask, b"\x00", {}, bits_per_symbol=1, alphabet_lookup=alphabet_lookup)
+
+
+def test_decode_residue_stream_invalid_huffman_code():
+    residues = ["A", "C"]
+    lengths = [1, 3]
+    encode_map, decode_map, max_len = _canonical_code_maps(residues, lengths)
+    encoded = bytes([0b11111111])
+    model = {"mode": 1, "decode_map": decode_map, "max_code_len": max_len}
+    alphabet_lookup = {"A": 0, "C": 1}
+    bitmask = bytes([0b00000001])
+    with pytest.raises(DecodingError):
+        _decode_residue_stream("A", bitmask, encoded, {"A": model}, bits_per_symbol=1, alphabet_lookup=alphabet_lookup)
+
+
+def test_decode_residue_stream_huffman_path():
+    residues = ["A", "C"]
+    lengths = [1, 3]
+    encode_map, decode_map, max_len = _canonical_code_maps(residues, lengths)
+    encoded = _pack_huffman_codes(encode_map, ["A", "C", "C"])
+    model = {"mode": 1, "decode_map": decode_map, "max_code_len": max_len}
+    alphabet_lookup = {"A": 0, "C": 1}
+    bitmask = bytes([0b00000111])
+    result = _decode_residue_stream("A", bitmask, encoded, {"A": model}, bits_per_symbol=1, alphabet_lookup=alphabet_lookup)
+    unpacked = _unpack_codes(result, 3, 1)
+    assert unpacked == [0, 1, 1]
+
+
+def test_decode_blocks_handles_empty_payload():
+    assert decode_blocks(b"", bitmask_bytes=1, bits_per_symbol=1, alphabet=["A"]) == []
+
+
+def test_decode_bitmask_round_trip_modes():
+    # mode 0 (raw)
+    bitmask_raw = bytes([0b10101010, 0b01010101])
+    mode, count, payload = _encode_bitmask(bitmask_raw, bitmask_bytes=len(bitmask_raw))
+    assert mode == 0
+    decoded = _decode_bitmask(mode, payload, count, len(bitmask_raw))
+    assert decoded[: len(bitmask_raw)] == bitmask_raw
+
+    # mode 1 (sparse varint encoding)
+    deltas = _write_varint(1) + _write_varint(8)
+    wrapper = _write_varint(len(deltas)) + deltas
+    decoded_sparse = _decode_bitmask(1, wrapper, deviation_count=2, bitmask_bytes=2)
+    assert decoded_sparse[:2] == bytes([0b00000001, 0b00000001])
+
+    # mode 2 (run-length encoded)
+    rle_payload = bytes([0b00000001, 4])
+    decoded_rle = _decode_bitmask(2, rle_payload, deviation_count=4, bitmask_bytes=4)
+    assert decoded_rle == bytes([0b00000001] * 4)
+
+    # zero deviations short-circuits to zeros
+    zero = _decode_bitmask(0, b"", deviation_count=0, bitmask_bytes=3)
+    assert zero == bytes(3)

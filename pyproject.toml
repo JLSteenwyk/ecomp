@@ -8,7 +8,7 @@ version = "0.1.0a0"
 description = "Lossless evolutionary-aware multiple sequence alignment compressor"
 readme = "README.md"
 requires-python = ">=3.11"
-license = {text = "MIT"}
+license = {file = "LICENSE"}
 authors = [{name = "Evolutionary Compression Team"}]
 dependencies = [
     "biopython>=1.83",

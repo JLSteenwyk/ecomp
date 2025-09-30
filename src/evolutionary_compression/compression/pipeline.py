@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import gzip
 import io
 import lzma
@@ -10,7 +11,7 @@ import os
 import time
 import zlib
 from dataclasses import dataclass
-from typing import Any, Iterable, List, Tuple
+from typing import Any, Iterable, List, Sequence, Tuple
 
 from ..diagnostics.checksums import alignment_checksum
 from ..io import AlignmentFrame, alignment_from_sequences
@@ -32,6 +33,238 @@ except ModuleNotFoundError:  # pragma: no cover - environment without zstd
 _SEQ_ID_MAGIC = b"ECID"
 _SEQ_ID_VERSION = 2
 _SAMPLE_CAP = 256
+
+
+_PERM_MAGIC = b"ECPE"
+_PERM_VERSION = 1
+_WIDTH_TO_CODE = {1: 0, 2: 1, 4: 2}
+_CODE_TO_WIDTH = {value: key for key, value in _WIDTH_TO_CODE.items()}
+
+
+def _build_permutation_chunk(
+    permutation: Sequence[int],
+) -> tuple[bytes | None, dict[str, Any] | None]:
+    """Encode *permutation* as a binary chunk stored alongside the payload."""
+
+    size = len(permutation)
+    if size == 0:
+        return None, None
+
+    max_value = max(permutation)
+    if max_value < 256:
+        width = 1
+    elif max_value < 65536:
+        width = 2
+    else:
+        width = 4
+    width_code = _WIDTH_TO_CODE[width]
+
+    raw = bytearray()
+    for value in permutation:
+        raw.extend(int(value).to_bytes(width, "little", signed=False))
+
+    compressed = zlib.compress(bytes(raw), level=9)
+    if len(compressed) + 8 < len(raw):
+        payload = compressed
+        compression_flag = 1
+    else:
+        payload = bytes(raw)
+        compression_flag = 0
+
+    chunk = bytearray()
+    chunk.extend(_PERM_MAGIC)
+    chunk.append(_PERM_VERSION)
+    chunk.append((width_code << 1) | compression_flag)
+    chunk.extend(_encode_varint(size))
+    chunk.extend(_encode_varint(len(payload)))
+    chunk.extend(payload)
+
+    chunk_bytes = bytes(chunk)
+    metadata = {"encoding": "payload", "length": len(chunk_bytes)}
+    return chunk_bytes, metadata
+
+
+def _extract_permutation_chunk(
+    payload_data: bytes, metadata: dict[str, Any]
+) -> tuple[bytes, list[int]]:
+    """Remove and decode the permutation chunk from *payload_data*."""
+
+    length = metadata.get("length")
+    if not isinstance(length, int) or length <= 0:
+        raise ValueError("Invalid permutation metadata length")
+    if len(payload_data) < length:
+        raise ValueError("Permutation chunk exceeds payload size")
+
+    chunk = memoryview(payload_data[:length])
+    cursor = 0
+    if chunk[cursor : cursor + 4].tobytes() != _PERM_MAGIC:
+        raise ValueError("Permutation chunk missing magic header")
+    cursor += 4
+
+    version = chunk[cursor]
+    cursor += 1
+    if version != _PERM_VERSION:
+        raise ValueError(f"Unsupported permutation chunk version: {version}")
+
+    flags = chunk[cursor]
+    cursor += 1
+    compression_flag = flags & 0x01
+    width_code = (flags >> 1) & 0x03
+    try:
+        width = _CODE_TO_WIDTH[width_code]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported permutation width code: {width_code}") from exc
+
+    size, cursor = _decode_varint(chunk, cursor)
+    payload_len, cursor = _decode_varint(chunk, cursor)
+    end = cursor + payload_len
+    if end != length:
+        raise ValueError("Permutation chunk length mismatch")
+
+    payload = bytes(chunk[cursor:end])
+    if compression_flag:
+        payload = zlib.decompress(payload)
+
+    if len(payload) != size * width:
+        raise ValueError("Permutation payload size mismatch")
+
+    permutation = [
+        int.from_bytes(payload[i : i + width], "little", signed=False)
+        for i in range(0, len(payload), width)
+    ]
+
+    return payload_data[length:], permutation
+
+
+def _decode_permutation(value: Any) -> list[int]:
+    """Decode legacy (pre-payload) permutation metadata formats."""
+
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [int(v) for v in value]
+    if not isinstance(value, dict):
+        raise ValueError("Unsupported permutation metadata format")
+
+    if value.get("encoding") == "payload":  # handled elsewhere
+        raise ValueError("Payload-encoded permutation should be extracted before decoding")
+
+    version = value.get("version", 0)
+    if version != _PERM_VERSION:
+        raise ValueError(f"Unsupported permutation metadata version: {version}")
+
+    size = int(value.get("size", 0))
+    dtype = value.get("dtype")
+    compression = value.get("compression", "none")
+    data = value.get("data", "")
+
+    payload = base64.b64decode(data.encode("ascii")) if data else b""
+    if compression == "zlib" and payload:
+        payload = zlib.decompress(payload)
+    elif compression not in {"none", "zlib"}:
+        raise ValueError(f"Unsupported permutation compression: {compression}")
+
+    width_lookup = {"uint8": 1, "uint16": 2, "uint32": 4}
+    try:
+        width = width_lookup[dtype]
+    except KeyError as exc:
+        raise ValueError(f"Unsupported permutation dtype: {dtype}") from exc
+
+    expected = size * width
+    if len(payload) != expected:
+        raise ValueError("Permutation payload length mismatch")
+
+    permutation = [
+        int.from_bytes(payload[i : i + width], "little", signed=False)
+        for i in range(0, expected, width)
+    ]
+    return permutation
+
+
+_GAP_CHARACTERS = {"-", ".", "?", "*", "X", "x"}
+
+
+def _compute_alignment_stats(frame: AlignmentFrame) -> dict[str, float] | None:
+    num_sequences = frame.num_sequences
+    alignment_length = frame.alignment_length
+    if num_sequences == 0 or alignment_length == 0:
+        return None
+
+    total_pairs = num_sequences * (num_sequences - 1) / 2
+    if total_pairs == 0:
+        total_pairs = 1.0
+
+    gap_free_columns = 0
+    variable_columns = 0
+    identity_sum = 0.0
+    identity_sumsq = 0.0
+
+    sequences = frame.sequences
+
+    for column_index in range(alignment_length):
+        column_counts: dict[str, int] = {}
+        has_gap = False
+        for seq in sequences:
+            char = seq[column_index]
+            if char in _GAP_CHARACTERS:
+                has_gap = True
+            column_counts[char] = column_counts.get(char, 0) + 1
+
+        non_gap_counts = [count for char, count in column_counts.items() if char not in _GAP_CHARACTERS]
+        if not has_gap:
+            gap_free_columns += 1
+        if len([count for count in non_gap_counts if count > 0]) > 1:
+            variable_columns += 1
+
+        identical_pairs = sum(count * (count - 1) / 2 for count in non_gap_counts)
+        identity = identical_pairs / total_pairs
+        identity_sum += identity
+        identity_sumsq += identity * identity
+
+    pair_identity_mean = identity_sum / alignment_length
+    variance = max(identity_sumsq / alignment_length - pair_identity_mean * pair_identity_mean, 0.0)
+    pair_identity_sd = math.sqrt(variance)
+
+    alphabet = sorted({char for seq in sequences for char in seq})
+    alphabet_index = {char: idx for idx, char in enumerate(alphabet)}
+    totals = [0.0 for _ in alphabet]
+    per_sequence_counts: list[list[int]] = []
+    for seq in sequences:
+        counts = [0] * len(alphabet)
+        for char in seq:
+            counts[alphabet_index[char]] += 1
+        per_sequence_counts.append(counts)
+        for idx, value in enumerate(counts):
+            totals[idx] += value
+
+    averages = [value / num_sequences for value in totals]
+    rcv_accumulator = 0.0
+    for counts in per_sequence_counts:
+        deviation = sum(abs(count - avg) for count, avg in zip(counts, averages))
+        rcv_accumulator += deviation
+    rcv_total = rcv_accumulator / (num_sequences * alignment_length)
+
+    return {
+        "gap_free_pct": 100.0 * gap_free_columns / alignment_length,
+        "variable_pct": 100.0 * variable_columns / alignment_length,
+        "pair_identity_mean": pair_identity_mean,
+        "pair_identity_sd": pair_identity_sd,
+        "rcv_total": rcv_total,
+    }
+
+
+def _should_use_tree(stats: dict[str, float] | None) -> bool:
+    if not stats:
+        return False
+    if stats.get("gap_free_pct", 0.0) < 5.0:
+        return False
+    if stats.get("rcv_total", 1.0) > 0.25:
+        return False
+    if stats.get("pair_identity_mean", 0.0) < 0.45:
+        return False
+    if stats.get("pair_identity_sd", 0.0) > 0.35:
+        return False
+    return True
 
 
 def _encode_varint(value: int) -> bytes:
@@ -410,7 +643,12 @@ def _compute_similarity_order(frame: AlignmentFrame) -> tuple[AlignmentFrame, li
     if num_sequences <= 2:
         return frame, baseline_order, "baseline"
 
-    tree_order = _tree_guided_order(frame)
+    stats = _compute_alignment_stats(frame)
+
+    tree_order = None
+    if stats is None or _should_use_tree(stats):
+        tree_order = _tree_guided_order(frame)
+
     if tree_order is not None:
         if tree_order == baseline_order:
             return frame, tree_order, "tree"
@@ -479,6 +717,12 @@ def compress_alignment(frame: AlignmentFrame) -> CompressedAlignment:
     )
     seq_id_block = _encode_sequence_ids(frame.ids)
     raw_payload = seq_id_block + run_length_payload
+    perm_chunk: bytes | None = None
+    perm_meta: dict[str, Any] | None = None
+    if permutation_changed:
+        perm_chunk, perm_meta = _build_permutation_chunk(permutation)
+        if perm_chunk:
+            raw_payload = perm_chunk + raw_payload
 
     payload_candidates: list[tuple[str, bytes, float]] = [("raw", raw_payload, 0.0)]
     # Try zstandard first; its ratio is typically better than zlib for genomic data.
@@ -520,8 +764,8 @@ def compress_alignment(frame: AlignmentFrame) -> CompressedAlignment:
         "sequence_id_codec": "inline",
         "ordering_strategy": order_label,
     }
-    if permutation_changed:
-        metadata["sequence_permutation"] = permutation
+    if perm_meta:
+        metadata["sequence_permutation"] = perm_meta
     metadata.pop("sequence_ids", None)
     payload_bytes, metadata = _maybe_use_gzip_fallback(
         original_frame, payload_bytes, metadata
@@ -570,6 +814,15 @@ def decompress_alignment(payload: bytes, metadata: dict[str, Any]) -> AlignmentF
         raise ValueError(f"Unsupported payload encoding: {payload_encoding}")
 
     payload_data = decoded_payload
+    permutation: list[int] | None = None
+    perm_meta = metadata.get("sequence_permutation")
+    if isinstance(perm_meta, dict) and perm_meta.get("encoding") == "payload":
+        payload_data, permutation = _extract_permutation_chunk(payload_data, perm_meta)
+        metadata["sequence_permutation"] = permutation
+    elif perm_meta is not None:
+        permutation = _decode_permutation(perm_meta)
+        metadata["sequence_permutation"] = permutation
+
     if payload_data.startswith(_SEQ_ID_MAGIC):
         seq_ids, payload_data = _decode_sequence_ids(payload_data)
         if sequence_ids is None:
