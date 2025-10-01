@@ -1,235 +1,146 @@
-# Evolutionary Compression (`ecomp`)
+<p align="center">
+  <a href="https://github.com/jlsteenwyk/ecomp">
+    <img src="https://raw.githubusercontent.com/JLSteenwyk/ecomp/master/docs/_static/img/logo.jpg" alt="Logo" width="400">
+  </a>
+  <p align="center">
+    <a href="https://jlsteenwyk.com/ecomp/">Docs</a>
+    ·
+    <a href="https://github.com/jlsteenwyk/ecomp/issues">Report Bug</a>
+    ·
+    <a href="https://github.com/jlsteenwyk/ecomp/issues">Request Feature</a>
+  </p>
+    <p align="center">
+        <a href="https://github.com/JLSteenwyk/ecomp/actions" alt="Build">
+            <img src="https://img.shields.io/github/actions/workflow/status/JLSteenwyk/ecomp/ci.yml?branch=master">
+        </a>
+        <a href="https://codecov.io/gh/jlsteenwyk/ecomp" alt="Coverage">
+          <img src="https://codecov.io/gh/jlsteenwyk/ecomp/branch/master/graph/badge.svg?token=0J49I6441V">
+        </a>
+        <a href="https://github.com/jlsteenwyk/ecomp/graphs/contributors" alt="Contributors">
+            <img src="https://img.shields.io/github/contributors/jlsteenwyk/ecomp">
+        </a>
+        <a href="https://bsky.app/profile/jlsteenwyk.bsky.social" target="_blank" rel="noopener noreferrer">
+          <img src="https://img.shields.io/badge/Bluesky-0285FF?logo=bluesky&logoColor=fff">
+        </a>
+        <br />
+        <a href="https://pepy.tech/badge/ecomp">
+          <img src="https://static.pepy.tech/personalized-badge/cliecompkit?period=total&units=international_system&left_color=grey&right_color=blue&left_text=PyPi%20Downloads">
+        </a>
+        <a href="https://anaconda.org/bioconda/ecomp">
+          <img src="https://img.shields.io/conda/dn/bioconda/ecomp?label=bioconda%20downloads" alt="Bioconda Downloads">
+        </a>
+        <a href="https://lbesson.mit-license.org/" alt="License">
+            <img src="https://img.shields.io/badge/License-MIT-blue.svg">
+        </a>
+        <br />
+        <a href="https://pypi.org/project/ecomp/" alt="PyPI - Python Version">
+            <img src="https://img.shields.io/pypi/pyversions/ecomp">
+        </a>
+        <!-- <a href="https://journals.plos.org/plosbiology/article?id=10.1371/journal.pbio.3001007">
+          <img src="https://zenodo.org/badge/DOI/10.1371/journal.pbio.3001007.svg">  
+        </a>    -->
+    </p>
+</p>
 
-`ecomp` is a Python toolkit for lossless compression and decompression of multiple
-sequence alignments (MSAs) tuned for evolutionary genomics workflows. The
-pipeline combines column-wise consensus discovery, deviation tracking, and
-run-length encoding to produce compact `.ecomp` payloads plus JSON metadata.
 
-## How eComp Differs From gzip and bzip2
+Lossless compression for evolutionary multiple-sequence alignments (MSAs).
 
-- **gzip** streams bytes through a dictionary-based (DEFLATE) coder. Repeated
-  byte sequences shorten, but the algorithm has no awareness of alignment
-  columns or alphabets. Each FASTA character is treated in isolation, so long
-  stretches of gaps and the repeating headers dominate the output size.
-- **bzip2** blocks data, applies Burrows–Wheeler and Huffman coding, and then
-  run-length encodes the transformed bytes. It improves on gzip for highly
-  repetitive text, yet again operates purely on byte patterns without knowing
-  which symbols belong to which sequence.
-- **eComp** exploits MSA structure. Every column is summarised by a consensus
-  residue plus a sparse list of deviations. The consensus stream and deviation
-  bitmasks are run-length encoded, and the residual payload is pushed through a
-  generic compressor (zstd/zlib/xz) only after the biological redundancy has
-  been stripped away.
+- **Evolution-aware** – stores per-column consensus + sparse deviations instead of
+  raw FASTA bytes.
+- **Portable archives** – a single `.ecomp` file embeds metadata (alphabet,
+  checksum, permutation, codec) with optional JSON sidecars for legacy workflows.
+- **Diagnostics included** – PhyKIT-style metrics (consensus, gap fraction, RCV,
+  pairwise identity, etc.) are computed directly from the compressed payload.
 
-### Toy Example
+---
 
-Given a tiny alignment:
+## Installation
 
-```
->seq1
-ACGTACGT
->seq2
-ACGTACGA
->seq3
-ACGTACGG
-```
-
-- **gzip / bzip2**: serialize the FASTA exactly as written and compress the raw
-  bytes. Repeated `ACGT` substrings help, but headers and per-sequence gaps are
-  still stored explicitly. Deviations in the final column (A/G) appear as
-  independent characters, so both compressors must encode them in full.
-- **eComp**:
-  1. Reads column 1 (`A/A/A`), stores consensus `A` and marks “no deviations”.
-  2. Repeats until the final column where the consensus is `A` with two
-     deviations (`seq2= A`, `seq3= G`). Only the consensus symbol and the two
-     deviating residues are emitted; all other positions inherit the consensus
-     for free.
-  3. Packs the deviation bitmask (which sequences differ), run-length encodes
-     blocks of identical columns, and finally compresses the already-compact
-     payload with zstd/zlib/xz.
-
-Because most columns are perfectly conserved, eComp emits a handful of bits per
-column, whereas gzip/bzip2 still allocate bytes for every residue in every
-sequence. On real MSAs (thousands of taxa × columns) this structural awareness
-translates into 2–3× better compression versus canonical codecs.
-
-### How the Toy Alignment Is Stored
-
-To see the storage format end to end, consider this 3x8 alignment:
-
-```
->seq1
-ACGTACGA
->seq2
-ACGTTCGA
->seq3
-ACGTACGG
-```
-
-- **Sequence ordering**: eComp may permute sequences to cluster similar rows.
-  Here the input order is already good, so no permutation needs to be written.
-
-- **Column modelling**: each column becomes a consensus residue plus a mask of
-  which sequences deviate. The mask uses the order `(seq1, seq2, seq3)` where a
-  `1` marks a deviation and the payload column lists those explicit residues.
-
-| Column | Residues (seq1/seq2/seq3) | Consensus | Deviation mask | Payload |
-|--------|---------------------------|-----------|----------------|---------|
-| 1      | A/A/A                     | A         | 000            | -       |
-| 2      | C/C/C                     | C         | 000            | -       |
-| 3      | G/G/G                     | G         | 000            | -       |
-| 4      | T/T/T                     | T         | 000            | -       |
-| 5      | A/T/A                     | A         | 010            | T       |
-| 6      | C/C/C                     | C         | 000            | -       |
-| 7      | G/G/G                     | G         | 000            | -       |
-| 8      | A/A/G                     | A         | 001            | G       |
-
-- **Run-length bundling**: contiguous columns sharing the same consensus and
-  mask are merged. Columns 1–4 become a single run with length 4, columns 6–7
-  form another run of length 2, and the columns with deviations (5 and 8) are
-  stored as single-column runs.
-
-- **What gzip sees**: gzip streams the FASTA bytes exactly as they appear. Every
-  header line, newline, and residue flows into the DEFLATE encoder with no
-  column awareness. The same alignment therefore expands to 24 residue bytes
-  plus six header/newline blocks before compression kicks in.
-
-| Stream chunk | Literal bytes | Description |
-|--------------|---------------|-------------|
-| `>seq1\n`    | 6             | Header for `seq1` (leading `>` and trailing newline). |
-| `ACGTACGA\n` | 9             | Row for `seq1`; every nucleotide stays literal. |
-| `>seq2\n`    | 6             | Header for `seq2`. |
-| `ACGTTCGA\n` | 9             | Row for `seq2`; mismatch `T` is just another byte. |
-| `>seq3\n`    | 6             | Header for `seq3`. |
-| `ACGTACGG\n` | 9             | Row for `seq3`; terminal `G` stored independently. |
-
-  Adding those chunks yields 45 literal bytes before DEFLATE coding.
-
-- **Binary layout**: the `.ecomp` payload records the sequence dictionary, the
-  consensus stream (`ACGTACGA`), the deviation bitmasks (`0000 010 00 001`), the
-  payload residues (`T` and `G`), and run-length counters (4,1,2,1). Only after
-  these structures are assembled does eComp hand the compact stream to zstd
-  (or another backend) for generic compression. The companion JSON stores the
-  alignment dimensions, alphabet, checksum, backend codec, and the no-op
-  permutation so the decompressor can rebuild the exact FASTA.
-
-  Those structures total eight consensus bytes, two deviation bytes, and four
-  run-length integers before the backend codec—around one third of the literal
-  payload gzip must stream.
-
-Compared with gzip, which must repeat every residue and header verbatim, eComp
-stores the consensus once, notes the sparse deviations, and reuses run lengths
-to avoid re-emitting conserved columns. Even this toy alignment shrinks from 24
-characters down to a handful of bytes before the final backend compression is
-applied.
-
-### Comparing Archive Layouts (gzip vs. eComp)
-
-```
-alignment.fasta          # source file (FASTA or PHYLIP)
-
-# gzip
-alignment.fasta.gz       # single compressed stream, no extra metadata
-
-# eComp
-alignment.ecomp          # binary payload with consensus + run-length stream
-alignment.json           # metadata sidecar (alignment stats, checksums, ordering)
-```
-
-gzip serializes the raw FASTA bytes and applies DEFLATE; decompression restores
-exactly the original text but requires no added structure awareness. eComp first
-reorders sequences (if beneficial), factors columns into consensus models, packs
-deviations, and only then applies a general-purpose backend (zstd/zlib/xz). The
-payload lives in `alignment.ecomp`, while `alignment.json` records everything
-needed to reconstruct the alignment (dimensions, alphabet, permutation, checksum
-and payload codec). Together these two files guarantee a lossless round trip
-even when the compressor chooses different ordering or encoding strategies per
-dataset.
-
-## Quickstart
 ```bash
-python3 -m venv venv --system-site-packages  # or omit flag if you can install deps
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 pip install .[dev]
 ```
-> NOTE: Installing dependencies requires outbound network access to PyPI.
-> If the environment is offline, ensure `biopython`, `numpy`, `bitarray`, and
-> dev tools (`pytest`, `ruff`, `black`, `mypy`, etc.) are provisioned manually.
 
-## CLI Usage
-# The CLI is available as `ecomp`.
+> Offline? Pre-install `biopython`, `numpy`, `bitarray`, and the dev tools
+> (`pytest`, `ruff`, `black`, `mypy`, …) inside your environment.
+
+---
+
+## CLI Quickstart
+
+All commands are exposed through the `ecomp` entry point.
+
 ```bash
-# Zip an alignment (writes example.ecomp + metadata JSON)
-ecomp zip example.fasta --metadata example.json  # metadata flag optional
+# Compress an alignment (produces example.ecomp, optional JSON sidecar)
+ecomp zip example.fasta --metadata example.json
 
-# Optionally supply a tree to guide ordering (tree is not stored)
-ecomp zip example.fasta --tree example.tree
-
-# Unzip (auto-detects codec from metadata)
+# Decompress (writes FASTA by default)
 ecomp unzip example.ecomp --alignment-output restored.fasta
 
-# Inspect metadata (JSON or short summary)
+# Inspect metadata (summary or JSON)
 ecomp inspect example.ecomp --summary
 
-# Alignment diagnostics (Phykit-style names with short aliases)
-ecomp consensus_sequence example.ecomp             # alias: con_seq
-ecomp column_base_counts example.ecomp             # alias: col_counts
-ecomp gap_fraction example.ecomp                   # alias: gap_frac
-ecomp shannon_entropy example.ecomp                # alias: entropy
-ecomp parsimony_informative_sites example.ecomp    # alias: parsimony
-ecomp constant_columns example.ecomp               # alias: const_cols
-ecomp pairwise_identity example.ecomp              # alias: pid
-ecomp alignment_length_excluding_gaps example.ecomp    # alias: len_no_gaps
-ecomp alignment_compressed_length example.ecomp        # alias: compressed_len
-ecomp variable_sites example.ecomp                     # alias: var_sites
-ecomp percentage_identity example.ecomp                # alias: pct_id
-ecomp relative_composition_variability example.ecomp   # alias: rcv
+# Diagnostics (Phykit-style aliases in parentheses)
+ecomp consensus_sequence example.ecomp             # con_seq
+ecomp column_base_counts example.ecomp             # col_counts
+ecomp gap_fraction example.ecomp                   # gap_frac
+ecomp shannon_entropy example.ecomp                # entropy
+ecomp parsimony_informative_sites example.ecomp    # parsimony
+ecomp constant_columns example.ecomp               # const_cols
+ecomp pairwise_identity example.ecomp              # pid
+ecomp alignment_length_excluding_gaps example.ecomp    # len_no_gaps
+ecomp alignment_compressed_length example.ecomp        # compressed_len
+ecomp variable_sites example.ecomp                     # var_sites
+ecomp percentage_identity example.ecomp                # pct_id
+ecomp relative_composition_variability example.ecomp   # rcv
 ```
-The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment`, `decompress_alignment`).
 
-## Development Workflow
-- Run the fast test suite (unit + non-slow integration):
-  ```bash
-  make test.fast
-  ```
-- Execute the full test matrix:
-  ```bash
-  make test
-  ```
-- Generate coverage reports for Codecov uploads:
-  ```bash
-  make test.coverage
-  ```
-- Lint and format:
-  ```bash
-  make lint
-  make format
-  ```
-- Type-check:
-  ```bash
-  mypy ecomp
-  ```
-- Pre-commit:
-  ```bash
-  pre-commit install
-  pre-commit run --all-files
-  ```
+Benchmarks mirror standard codec comparisons:
 
-## Benchmarking
-Use the CLI together with standard timing tools to compare eComp to other
-codecs. A quick local comparison works with the bundled fixture:
 ```bash
-/usr/bin/time -p ecomp zip data/fixtures/small_phylo.fasta \
-  --output out.ecomp
-/usr/bin/time -p gzip -k data/fixtures/small_phylo.fasta
+/usr/bin/time -p ecomp zip data/fixtures/small_phylo.fasta --output out.ecomp
+/usr/bin/time -p gzip  -k data/fixtures/small_phylo.fasta
+/usr/bin/time -p bzip2 -k data/fixtures/small_phylo.fasta
 ```
-Round-trip the archive to confirm correctness before discarding temporary files.
 
-Larger alignments and manuscript figures are published alongside the paper in
-`../EVOCOMP_MANUSCRIPT/` (or the companion data archive). Set an environment
-variable such as `EVOCOMP_DATA_ROOT` to point at that directory when running the
-workflows under `docs/tutorials/`.
+---
 
-Additional roadmap milestones and contributor practices are documented in
-`ECOMP_CODEBASE_PLAN.md` and `AGENTS.md`.
+## Python API
+
+Everything the CLI does is re-exported in `ecomp`.
+
+```python
+from ecomp import zip, unzip, read_alignment, percentage_identity, column_base_counts
+
+# File-based workflow
+archive_path, metadata_path = zip(
+    "data/example.fasta",
+    metadata_path="data/example.json",  # optional JSON copy
+)
+restored_path = unzip(archive_path, output_path="data/restored.fasta")
+
+# Diagnostics on an AlignmentFrame
+frame = read_alignment("data/example.fasta")
+pct_identity = percentage_identity(frame)
+base_counts = column_base_counts(frame)
+
+print(f"Mean pairwise identity: {pct_identity:.2f}%")
+print("Column 1 counts:", base_counts[0])
+```
+
+In-memory usage (no intermediate files):
+
+```python
+from ecomp import AlignmentFrame, compress_alignment, decompress_alignment
+
+frame = AlignmentFrame(
+    ids=["s1", "s2"],
+    sequences=["ACGT", "ACGA"],
+    alphabet=["A", "C", "G", "T"],
+)
+compressed = compress_alignment(frame)
+restored = decompress_alignment(compressed.payload, compressed.metadata)
+assert restored.sequences == frame.sequences
+```
