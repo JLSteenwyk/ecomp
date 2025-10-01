@@ -158,35 +158,35 @@ pip install .[dev]
 > dev tools (`pytest`, `ruff`, `black`, `mypy`, etc.) are provisioned manually.
 
 ## CLI Usage
-# The CLI is available as `codex` (legacy aliases: `ecomp`, `ec`).
+# The CLI is available as `ecomp`.
 ```bash
 # Zip an alignment (writes example.ecomp + metadata JSON)
-codex zip example.fasta
+ecomp zip example.fasta --metadata example.json  # metadata flag optional
 
 # Optionally supply a tree to guide ordering (tree is not stored)
-codex zip example.fasta --tree example.tree
+ecomp zip example.fasta --tree example.tree
 
 # Unzip (auto-detects codec from metadata)
-codex unzip example.ecomp --alignment-output restored.fasta
+ecomp unzip example.ecomp --alignment-output restored.fasta
 
 # Inspect metadata (JSON or short summary)
-codex inspect example.ecomp --summary
+ecomp inspect example.ecomp --summary
 
 # Alignment diagnostics (Phykit-style names with short aliases)
-codex consensus_sequence example.ecomp             # alias: ec con_seq
-codex column_base_counts example.ecomp             # alias: ec col_counts
-codex gap_fraction example.ecomp                   # alias: ec gap_frac
-codex shannon_entropy example.ecomp                # alias: ec entropy
-codex parsimony_informative_sites example.ecomp    # alias: ec parsimony
-codex constant_columns example.ecomp               # alias: ec const_cols
-codex pairwise_identity example.ecomp              # alias: ec pid
-codex alignment_length_excluding_gaps example.ecomp    # alias: ec len_no_gaps
-codex alignment_compressed_length example.ecomp        # alias: ec compressed_len
-codex variable_sites example.ecomp                     # alias: ec var_sites
-codex percentage_identity example.ecomp                # alias: ec pct_id
-codex relative_composition_variability example.ecomp   # alias: ec rcv
+ecomp consensus_sequence example.ecomp             # alias: con_seq
+ecomp column_base_counts example.ecomp             # alias: col_counts
+ecomp gap_fraction example.ecomp                   # alias: gap_frac
+ecomp shannon_entropy example.ecomp                # alias: entropy
+ecomp parsimony_informative_sites example.ecomp    # alias: parsimony
+ecomp constant_columns example.ecomp               # alias: const_cols
+ecomp pairwise_identity example.ecomp              # alias: pid
+ecomp alignment_length_excluding_gaps example.ecomp    # alias: len_no_gaps
+ecomp alignment_compressed_length example.ecomp        # alias: compressed_len
+ecomp variable_sites example.ecomp                     # alias: var_sites
+ecomp percentage_identity example.ecomp                # alias: pct_id
+ecomp relative_composition_variability example.ecomp   # alias: rcv
 ```
-The `codex` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment`, `decompress_alignment`).
+The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment`, `decompress_alignment`).
 
 ## Development Workflow
 - Run the fast test suite (unit + non-slow integration):
@@ -208,7 +208,7 @@ The `codex` entry point mirrors the public Python API (`compress_file`, `decompr
   ```
 - Type-check:
   ```bash
-  mypy src
+  mypy ecomp
   ```
 - Pre-commit:
   ```bash
@@ -220,7 +220,7 @@ The `codex` entry point mirrors the public Python API (`compress_file`, `decompr
 Use the CLI together with standard timing tools to compare eComp to other
 codecs. A quick local comparison works with the bundled fixture:
 ```bash
-/usr/bin/time -p codex zip data/fixtures/small_phylo.fasta \
+/usr/bin/time -p ecomp zip data/fixtures/small_phylo.fasta \
   --output out.ecomp
 /usr/bin/time -p gzip -k data/fixtures/small_phylo.fasta
 ```

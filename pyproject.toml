@@ -29,8 +29,6 @@ classifiers = [
 
 [project.scripts]
 ecomp = "ecomp.cli:main"
-ec = "ecomp.cli:main"
-codex = "ecomp.cli:main"
 
 [tool.black]
 line-length = 88

@@ -34,6 +34,8 @@ __all__ = [
     "CompressedAlignment",
     "compress_file",
     "decompress_file",
+    "zip",
+    "unzip",
     "compress_alignment",
     "decompress_alignment",
     "read_alignment",
@@ -63,11 +65,11 @@ def compress_file(
     output_path: str | Path | None = None,
     metadata_path: str | Path | None = None,
     input_format: str | None = None,
-) -> Tuple[Path, Path]:
+) -> Tuple[Path, Path | None]:
     """Compress *input_path* producing an `.ecomp` archive.
 
-    Returns ``(archive_path, metadata_copy_path)``. The metadata copy path defaults
-    to ``derive_metadata_path(archive_path)`` when *metadata_path* is not supplied.
+    Returns ``(archive_path, metadata_copy_path)``. Metadata is embedded inside the
+    archive by default; pass *metadata_path* to also persist a JSON sidecar.
     """
 
     input_path = Path(input_path)
@@ -75,11 +77,7 @@ def compress_file(
     compressed = compress_alignment(frame)
 
     target_path = Path(output_path) if output_path else input_path.with_suffix(".ecomp")
-    metadata_file = (
-        Path(metadata_path)
-        if metadata_path
-        else derive_metadata_path(target_path)
-    )
+    metadata_file = Path(metadata_path) if metadata_path else None
 
     write_archive(target_path, compressed.payload, compressed.metadata)
 
@@ -125,3 +123,37 @@ def decompress_file(
     destination = Path(output_path) if output_path else ecomp_path.with_suffix(f".{output_format or DEFAULT_OUTPUT_FORMAT}")
     write_alignment(frame, destination, fmt=output_format)
     return destination
+
+
+def zip(
+    input_path: str | Path,
+    output_path: str | Path | None = None,
+    metadata_path: str | Path | None = None,
+    input_format: str | None = None,
+) -> Tuple[Path, Path]:
+    """Alias for :func:`compress_file` mirroring the CLI verb."""
+
+    return compress_file(
+        input_path=input_path,
+        output_path=output_path,
+        metadata_path=metadata_path,
+        input_format=input_format,
+    )
+
+
+def unzip(
+    ecomp_path: str | Path,
+    output_path: str | Path | None = None,
+    metadata_path: str | Path | None = None,
+    output_format: str | None = None,
+    validate_checksum: bool = True,
+) -> Path:
+    """Alias for :func:`decompress_file` mirroring the CLI verb."""
+
+    return decompress_file(
+        ecomp_path=ecomp_path,
+        output_path=output_path,
+        metadata_path=metadata_path,
+        output_format=output_format,
+        validate_checksum=validate_checksum,
+    )

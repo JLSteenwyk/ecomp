@@ -76,7 +76,7 @@ def _load_alignment_from_archive(
 
 
 def _add_archive_options(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("archive", help="Compressed archive produced by `codex zip`")
+    parser.add_argument("archive", help="Compressed archive produced by `ecomp zip`")
     parser.add_argument(
         "-m",
         "--metadata",
@@ -300,7 +300,7 @@ def _add_unzip_arguments(
         aliases=["decompress"],
         help="Restore data from an evolutionary compression archive",
     )
-    parser.add_argument("archive", help="Compressed archive produced by `codex zip`")
+    parser.add_argument("archive", help="Compressed archive produced by `ecomp zip`")
     parser.add_argument(
         "-m",
         "--metadata",
@@ -352,7 +352,7 @@ def _add_inspect_arguments(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="codex",
+        prog="ecomp",
         description="Evolutionary compression toolkit for multiple sequence alignments",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)

@@ -47,7 +47,7 @@ coverage.integration:
 
 bench:
 	@echo "Run CLI benchmarks with:"
-	@echo "  /usr/bin/time -p codex zip data/fixtures/small_phylo.fasta --output out.ecomp"
+	@echo "  /usr/bin/time -p ecomp zip data/fixtures/small_phylo.fasta --output out.ecomp"
 	@echo "Compare the timing and archive sizes against gzip, bzip2, or xz as needed."
 
 docs:
