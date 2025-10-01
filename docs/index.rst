@@ -1,20 +1,90 @@
-Evolutionary Compression Documentation
-======================================
+.. role:: raw-html(raw)
+    :format: html
 
-Welcome to the eComp documentation. This site mirrors the structure of the
-PhyKIT docs so users familiar with that project can navigate quickly. Use the
-sections below to learn about the project, explore usage examples, or dive into
-API and developer notes.
+.. image:: _static/img/logo_top_only.png 
+   :width: 55%
+   :align: center
+   :target: https://jlsteenwyk.com/ecomp
+
+^^^^^
+
+eComp uses evolution-based principles to conduct lossless compression of multiple sequence alignments.
+
+The resulting files can be efficiently parsed for key information, such as the consensus sequence, number of parsimony-informative sites, and other metrics.
+
+:raw-html:`<br />`
+
+Quick start
+===========
+
+**Installation**
+
+1. Create and activate a fresh Python environment (3.11+):
+
+   .. code-block:: bash
+
+      python3 -m venv venv
+      source venv/bin/activate
+
+2. Install eComp and its development extras:
+
+   .. code-block:: bash
+
+      pip install -r requirements.txt
+      pip install .[dev]
+
+:raw-html:`<br />`
+
+**CLI Usage**
+
+The ``ecomp`` command exposes all compression, decompression, and metrics:
+
+.. code-block:: bash
+
+   # Compress an alignment (produces example.ecomp)
+   ecomp zip example.fasta
+
+   # Decompress (writes FASTA by default)
+   ecomp unzip example.ecomp --alignment-output restored.fasta
+
+   # Inspect metadata (summary or JSON)
+   ecomp inspect example.ecomp --summary
+
+   # PhyKIT-style diagnostics (alias shown in parentheses)
+   ecomp consensus_sequence example.ecomp         # (con_seq)
+   ecomp pairwise_identity example.ecomp          # (pid)
+   ecomp variable_sites example.ecomp             # (var_sites)
+
+:raw-html:`<br />`
+
+**API Usage**
+
+All CLI functionality is re-exported via ``ecomp``:
+
+.. code-block:: python
+
+   from ecomp import read_alignment, zip, unzip
+
+   frame = read_alignment("example.fasta")
+   archive_path, metadata_path = zip(
+       "example.fasta",
+       metadata_path="example.json",  # optional JSON sidecar
+   )
+   restored_path = unzip(archive_path)
+
+   from ecomp import percentage_identity
+   pct_identity = percentage_identity(frame)
+
+:raw-html:`<br />`:raw-html:`<br />`
+
+Quick Start
+===========
 
 .. toctree::
-   :maxdepth: 2
-   :caption: Table of Contents
+   :maxdepth: 1
 
-   about/overview
-   usage/quickstart
-   usage/benchmarking
-   usage/api
-   tutorials/workflows
-   frequently_asked_questions/index
+   about/index
+   usage/index
    change_log/index
    other_software/index
+   faq/index

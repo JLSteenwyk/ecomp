@@ -8,7 +8,7 @@ import sphinx_rtd_theme
 
 # -- Path setup --------------------------------------------------------------
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, "..", "src")))
+sys.path.insert(0, os.path.abspath(os.path.join(BASE_DIR, "..")))
 
 # -- Project information -----------------------------------------------------
 project = "eComp"
@@ -28,13 +28,14 @@ master_doc = "index"
 # -- Options for HTML output -------------------------------------------------
 html_theme = "sphinx_rtd_theme"
 html_logo = None
-html_favicon = None
-html_static_path = []
+html_favicon = "_static/favicon.png"
+html_static_path = ["_static"]
 html_show_sourcelink = False
 html_theme_options = {
     "body_max_width": "900px",
     "logo_only": True,
 }
+html_css_files = ["css/custom.css"]
 
 html_sidebars = {
     "**": [

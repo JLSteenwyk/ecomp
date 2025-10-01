@@ -1,5 +1,5 @@
-Frequently Asked Questions
-==========================
+FAQ
+===
 
 How do I install eComp offline?
 -------------------------------
@@ -12,13 +12,13 @@ Why does compression fail with "sequence IDs mismatch"?
 -------------------------------------------------------
 
 This indicates the metadata (usually the JSON file) was edited or mismatched with
-the payload.  Run ``codex inspect`` to confirm the checksum, or re-run
-``codex zip`` to regenerate both files together.
+the payload.  Run ``ecomp inspect`` to confirm the checksum, or re-run
+``ecomp zip`` to regenerate both files together.
 
 Can I supply a tree to improve compression?
 -------------------------------------------
 
-Yes.  Pass ``--tree path/to/tree.nwk`` when running ``codex zip``.  The tree is
+Yes.  Pass ``--tree path/to/tree.nwk`` when running ``ecomp zip``.  The tree is
 used only to reorder the sequences; it is *not* stored in the archive.  This often
 reduces the number of deviations per column and improves the compression ratio.
 
