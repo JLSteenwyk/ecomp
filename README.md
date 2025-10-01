@@ -26,9 +26,9 @@
         <a href="https://pepy.tech/badge/ecomp">
           <img src="https://static.pepy.tech/personalized-badge/cliecompkit?period=total&units=international_system&left_color=grey&right_color=blue&left_text=PyPi%20Downloads">
         </a>
-        <a href="https://anaconda.org/bioconda/ecomp">
+        <!-- <a href="https://anaconda.org/bioconda/ecomp">
           <img src="https://img.shields.io/conda/dn/bioconda/ecomp?label=bioconda%20downloads" alt="Bioconda Downloads">
-        </a>
+        </a> -->
         <a href="https://lbesson.mit-license.org/" alt="License">
             <img src="https://img.shields.io/badge/License-MIT-blue.svg">
         </a>
@@ -43,18 +43,19 @@
 </p>
 
 
-Lossless compression for evolutionary multiple-sequence alignments (MSAs).
-
-- **Evolution-aware** – stores per-column consensus + sparse deviations instead of
-  raw FASTA bytes.
-- **Portable archives** – a single `.ecomp` file embeds metadata (alphabet,
-  checksum, permutation, codec) with optional JSON sidecars for legacy workflows.
-- **Diagnostics included** – PhyKIT-style metrics (consensus, gap fraction, RCV,
-  pairwise identity, etc.) are computed directly from the compressed payload.
+Evolution-informed lossless compression of multiple-sequence alignments (MSAs).
 
 ---
 
 ## Installation
+
+From PyPI (recommended for users):
+
+```bash
+pip install ecomp
+```
+
+From source:
 
 ```bash
 python3 -m venv venv

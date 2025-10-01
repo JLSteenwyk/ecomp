@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evolutionary-compression"
+version = "0.1.0"
+description = "Legacy shim package for the eComp project."
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [{name = "eComp Developers"}]
+dependencies = ["ecomp>=0.1.0"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Project Home" = "https://example.com/ecomp"
+"Repository" = "https://github.com/jacoblsteenwyk/evolutionary_compression"

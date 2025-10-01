@@ -3,13 +3,13 @@ requires = ["setuptools>=64", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "evolutionary-compression"
+name = "ecomp"
 dynamic = ["version"]
 description = "Lossless evolutionary-aware multiple sequence alignment compressor"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {file = "LICENSE"}
-authors = [{name = "Evolutionary Compression Team"}]
+authors = [{name = "Jacob L Steenwyk"}]
 dependencies = [
     "biopython>=1.83",
     "numpy>=1.24",
