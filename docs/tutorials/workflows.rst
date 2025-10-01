@@ -16,13 +16,13 @@ Compress an alignment directory
         tree="${fasta}.tre"
         tree_args=()
         [ -f "$tree" ] && tree_args=(--tree "$tree")
-        ecomp compress "$fasta" "archives/${base}.ecomp" "${tree_args[@]}" \
+        codex zip "$fasta" "archives/${base}.ecomp" "${tree_args[@]}" \
             -m "archives/${base}.json"
     done
 
     # Quick validation pass
     for archive in archives/*.ecomp; do
-        ecomp inspect "$archive" --summary
+        codex inspect "$archive" --summary
     done
 
 Benchmark canonical codecs vs. eComp
@@ -32,7 +32,7 @@ Benchmark canonical codecs vs. eComp
 
     SUPP=${EVOCOMP_DATA_ROOT:-../EVOCOMP_MANUSCRIPT}
     target="$SUPP/data_large/ascomycota_data/EOG092D005G.fasta"
-    /usr/bin/time -p ecomp compress "$target" --output "$target.ecomp"
+    /usr/bin/time -p codex zip "$target" --output "$target.ecomp"
     /usr/bin/time -p gzip -k "$target"
     /usr/bin/time -p bzip2 -k "$target"
     /usr/bin/time -p xz -k "$target"
@@ -54,7 +54,7 @@ Tree-guided ordering sweep
     target="$SUPP/data_large/ascomycota_data/EOG092D005G.fasta"
     tree="${target}.tre"
     for mode in baseline greedy mst; do
-        ECOMP_SEQUENCE_ORDER="$mode" ecomp compress "$target" "${target}.${mode}.ecomp" \
+        ECOMP_SEQUENCE_ORDER="$mode" codex zip "$target" "${target}.${mode}.ecomp" \
             --tree "$tree" -m "${target}.${mode}.json"
     done
 
@@ -82,7 +82,7 @@ Integrate with Python pipelines
 
 .. code-block:: python
 
-    from evolutionary_compression import read_alignment, compress_alignment
+    from ecomp import read_alignment, compress_alignment
 
     frame = read_alignment("data/fixtures/small_phylo.fasta")
     with open("data/fixtures/small_phylo.tree") as handle:

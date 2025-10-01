@@ -8,7 +8,7 @@ PhyKIT
 
 IQ-TREE / RAxML-NG
   Use these to infer phylogenies after decompressing an alignment, or to supply
-  trees that improve compression (pass ``--tree path/to/tree`` to ``ecomp compress``
+  trees that improve compression (pass ``--tree path/to/tree`` to ``codex zip``
   or set ``frame.metadata['tree_newick']`` in the Python API).
 
 MAFFT / ClipKIT / AMAS

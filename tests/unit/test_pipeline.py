@@ -1,18 +1,24 @@
-import os
-import random
+import gzip
 import lzma
-
 import math
+import random
 
 import pytest
 
-from evolutionary_compression.io import alignment_from_sequences
-from evolutionary_compression.compression import pipeline
-from evolutionary_compression.compression.pipeline import compress_alignment, decompress_alignment
-from evolutionary_compression.diagnostics.checksums import alignment_checksum
-from evolutionary_compression.compression.consensus import collect_column_profiles
-from evolutionary_compression.compression.rle import collect_run_length_blocks
-from evolutionary_compression.compression.encoding import encode_blocks
+from ecomp.io import alignment_from_sequences
+from ecomp.compression import pipeline
+from ecomp.compression.pipeline import (
+    _alignment_to_fasta_bytes,
+    _maybe_use_gzip_fallback,
+    _parse_fasta_bytes,
+    _decompress_fallback,
+    compress_alignment,
+    decompress_alignment,
+)
+from ecomp.diagnostics.checksums import alignment_checksum
+from ecomp.compression.consensus import collect_column_profiles
+from ecomp.compression.rle import collect_run_length_blocks
+from ecomp.compression.encoding import encode_blocks
 
 
 def _build_raw_payload_and_metadata(frame):
@@ -50,6 +56,89 @@ def _build_raw_payload_and_metadata(frame):
         "ordering_strategy": "baseline",
     }
     return raw_payload, metadata
+
+
+def test_maybe_use_gzip_fallback_replaces_payload(tmp_path):
+    frame = alignment_from_sequences(ids=["s1"], sequences=["A" * 1024], metadata={})
+    payload = b"X" * 4096
+    metadata = {
+        "source_format": "fasta",
+        "payload_encoding": "raw",
+        "payload_encoded_bytes": len(payload),
+        "payload_raw_bytes": len(payload),
+    }
+    new_payload, new_metadata = _maybe_use_gzip_fallback(frame, payload, metadata)
+    assert len(new_payload) < len(payload)
+    fallback = new_metadata.get("fallback", {})
+    assert fallback.get("type") == "gzip"
+    assert new_metadata["payload_encoding"] == "gzip"
+
+
+def test_decompress_alignment_supports_xz_payload():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "TTTT"])
+    payload, metadata = _build_raw_payload_and_metadata(frame)
+    metadata["payload_encoding"] = "xz"
+    compressed_payload = lzma.compress(payload)
+    rebuilt = decompress_alignment(compressed_payload, metadata)
+    assert rebuilt.sequences == frame.sequences
+
+
+def test_decompress_alignment_handles_permutation_sidecar():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "TTTT"])
+    compressed = compress_alignment(frame)
+    metadata = dict(compressed.metadata)
+    metadata["sequence_permutation"] = [1, 0]
+    restored = decompress_alignment(compressed.payload, metadata)
+    assert restored.ids == ["s2", "s1"]
+    assert restored.sequences == frame.sequences[::-1]
+
+
+def test_decompress_alignment_handles_payload_sequence_ids():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AAAA", "TTTT"])
+    compressed = compress_alignment(frame)
+    metadata = dict(compressed.metadata)
+    metadata["sequence_ids"] = ["s1", "s2"]
+    rebuilt = decompress_alignment(compressed.payload, metadata)
+    assert rebuilt.ids == frame.ids
+
+
+def test_decompress_alignment_raises_for_unknown_encoding():
+    frame = alignment_from_sequences(ids=["s1"], sequences=["AAAA"])
+    payload, metadata = _build_raw_payload_and_metadata(frame)
+    metadata["payload_encoding"] = "bogus"
+    with pytest.raises(ValueError, match="Unsupported payload encoding"):
+        decompress_alignment(payload, metadata)
+
+
+def test_decompress_alignment_raises_when_zstd_missing(monkeypatch):
+    frame = alignment_from_sequences(ids=["s1"], sequences=["AAAA"])
+    payload, metadata = _build_raw_payload_and_metadata(frame)
+    metadata["payload_encoding"] = "zstd"
+    monkeypatch.setattr(pipeline, "_ZSTD_DECOMPRESSOR", None)
+    with pytest.raises(RuntimeError, match="zstandard module not available"):
+        decompress_alignment(payload, metadata)
+
+
+def test_decompress_alignment_infers_bits_from_alphabet():
+    frame = alignment_from_sequences(ids=["s1"], sequences=["AA"])
+    payload, metadata = _build_raw_payload_and_metadata(frame)
+    metadata.pop("bits_per_symbol", None)
+    metadata["alphabet"] = frame.alphabet
+    rebuilt = decompress_alignment(payload, metadata)
+    assert rebuilt.sequences == frame.sequences
+
+
+def test_decompress_fallback_round_trip():
+    frame = alignment_from_sequences(ids=["s1", "s2"], sequences=["AC", "AG"])
+    fasta_bytes = _alignment_to_fasta_bytes(frame)
+    gzip_payload = gzip.compress(fasta_bytes)
+    metadata = {
+        "fallback": {"type": "gzip", "format": "fasta"},
+        "source_format": "fasta",
+    }
+    restored = _decompress_fallback(gzip_payload, metadata)
+    assert restored.ids == frame.ids
+    assert restored.sequences == frame.sequences
 
 
 def test_compress_decompress_preserves_sequences():

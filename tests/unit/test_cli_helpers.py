@@ -1,7 +1,7 @@
 import pytest
 
-from evolutionary_compression.cli import _verify_checksum, build_parser, main
-from evolutionary_compression.diagnostics.checksums import alignment_checksum
+from ecomp.cli import _verify_checksum, build_parser, main
+from ecomp.diagnostics.checksums import alignment_checksum
 
 
 def test_verify_checksum_passes():

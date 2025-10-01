@@ -1,8 +1,8 @@
 import math
 
-from evolutionary_compression.io import alignment_from_sequences
-from evolutionary_compression.compression.consensus import collect_column_profiles
-from evolutionary_compression.compression.rle import collect_run_length_blocks
+from ecomp.io import alignment_from_sequences
+from ecomp.compression.consensus import collect_column_profiles
+from ecomp.compression.rle import collect_run_length_blocks
 
 
 def test_run_length_blocks_group_identical_columns():

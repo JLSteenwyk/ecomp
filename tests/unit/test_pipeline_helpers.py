@@ -4,9 +4,9 @@ import base64
 import zlib
 import pytest
 
-from evolutionary_compression.io import alignment_from_sequences
+from ecomp.io import alignment_from_sequences
 
-from evolutionary_compression.compression.pipeline import (
+from ecomp.compression.pipeline import (
     _SEQ_ID_MAGIC,
     _ZSTD_DECOMPRESSOR,
     _WIDTH_TO_CODE,
@@ -24,6 +24,15 @@ from evolutionary_compression.compression.pipeline import (
     _maybe_use_gzip_fallback,
     _parse_fasta_bytes,
     _select_sample_indices,
+)
+from ecomp.compression.encoding import (
+    DecodingError,
+    EncodingError,
+    RunLengthBlock,
+    _decode_bitmask,
+    _decode_residue_stream,
+    _encode_bitmask,
+    _pack_codes,
 )
 
 
@@ -43,6 +52,82 @@ def test_decode_residues_round_trip():
 def test_decode_residues_raises_on_insufficient_data():
     with pytest.raises(ValueError):
         _decode_residues(b"\x00", count=5, bits_per_symbol=3, alphabet=["A", "C", "G", "T"])
+
+
+def test_decode_residue_stream_mode_zero_round_trip():
+    bitmask = bytes([0b00000001])
+    models = {
+        "A": {
+            "mode": 0,
+            "width": 1,
+            "residues": ["G", "T"],
+        }
+    }
+    encoded = _pack_codes([1], bits_per_symbol=1)
+    alphabet_lookup = {char: idx for idx, char in enumerate(["A", "C", "G", "T"])}
+    packed = _decode_residue_stream(
+        "A",
+        bitmask,
+        encoded,
+        models,
+        bits_per_symbol=2,
+        alphabet_lookup=alphabet_lookup,
+    )
+    decoded = _decode_residues(packed, count=1, bits_per_symbol=2, alphabet=["A", "C", "G", "T"])
+    assert decoded == ["T"]
+
+
+def test_decode_residue_stream_huffman_round_trip():
+    bitmask = bytes([0b00000011])
+    models = {
+        "A": {
+            "mode": 1,
+            "decode_map": {
+                (1, 0): "G",
+                (2, 2): "T",
+            },
+            "max_code_len": 2,
+        }
+    }
+    # Bits: 0 (for G), 1 0 (for T) -> 0b01000000
+    encoded = bytes([0b01000000])
+    alphabet_lookup = {char: idx for idx, char in enumerate(["A", "C", "G", "T"])}
+    packed = _decode_residue_stream(
+        "A",
+        bitmask,
+        encoded,
+        models,
+        bits_per_symbol=2,
+        alphabet_lookup=alphabet_lookup,
+    )
+    decoded = _decode_residues(packed, count=2, bits_per_symbol=2, alphabet=["A", "C", "G", "T"])
+    assert decoded == ["G", "T"]
+
+
+def test_decode_residue_stream_errors_when_model_missing():
+    bitmask = bytes([0b00000001])
+    with pytest.raises(DecodingError):
+        _decode_residue_stream(
+            "A",
+            bitmask,
+            b"\x00",
+            {},
+            bits_per_symbol=2,
+            alphabet_lookup={"A": 0},
+        )
+
+
+def test_decode_bitmask_sparse_and_rle_modes():
+    bitmask = bytes([0b00010001])
+    mode, deviation_count, payload = _encode_bitmask(bitmask, bitmask_bytes=len(bitmask))
+    assert mode in {0, 1, 2}
+    decoded = _decode_bitmask(mode, payload, deviation_count, len(bitmask))
+    assert decoded == bitmask
+
+
+def test_decode_bitmask_raises_on_unknown_mode():
+    with pytest.raises(DecodingError):
+        _decode_bitmask(5, b"payload", deviation_count=1, bitmask_bytes=1)
 
 
 def test_alignment_to_fasta_bytes_round_trip(tmp_path: Path):

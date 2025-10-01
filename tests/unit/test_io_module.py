@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from evolutionary_compression.io import AlignmentFrame, alignment_from_sequences, read_alignment, write_alignment
+from ecomp.io import AlignmentFrame, alignment_from_sequences, read_alignment, write_alignment
 
 
 def test_alignment_frame_alphabet_string_returns_sorted_unique():

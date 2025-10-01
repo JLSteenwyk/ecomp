@@ -2,12 +2,12 @@ Python API
 ==========
 
 The CLI is a thin wrapper around a small Python surface that lives in
-``evolutionary_compression.__init__``.  Import these helpers when you want to plug
+``ecomp.__init__``.  Import these helpers when you want to plug
 compression into a larger workflow without spawning subprocesses.
 
 .. code-block:: python
 
-    from evolutionary_compression import (
+    from ecomp import (
         read_alignment,
         compress_alignment,
         decompress_alignment,

@@ -1,12 +1,12 @@
 import math
 
-from evolutionary_compression.io import alignment_from_sequences
-from evolutionary_compression.compression.consensus import collect_column_profiles
+from ecomp.io import alignment_from_sequences
+from ecomp.compression.consensus import collect_column_profiles
 import struct
 
 import pytest
 
-from evolutionary_compression.compression.encoding import (
+from ecomp.compression.encoding import (
     DecodingError,
     EncodingError,
     _build_dictionary,
@@ -24,8 +24,8 @@ from evolutionary_compression.compression.encoding import (
     decode_blocks,
     encode_blocks,
 )
-from evolutionary_compression.compression.rle import RunLengthBlock, collect_run_length_blocks
-from evolutionary_compression.compression import pipeline
+from ecomp.compression.rle import RunLengthBlock, collect_run_length_blocks
+from ecomp.compression import pipeline
 
 
 def test_encode_decode_round_trip():

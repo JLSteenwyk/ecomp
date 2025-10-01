@@ -1,4 +1,4 @@
-from evolutionary_compression.config import (
+from ecomp.config import (
     DEFAULT_OUTPUT_FORMAT,
     METADATA_SUFFIX,
     SUPPORTED_INPUT_FORMATS,

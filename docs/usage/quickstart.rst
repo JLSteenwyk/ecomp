@@ -23,35 +23,49 @@ The optional development extras (linting, tests) can be installed via
 Command-line usage
 ------------------
 
-Three sub-commands cover the common tasks (the ``ec`` alias is provided for
-convenience):
+Three sub-commands cover the common tasks (legacy ``ecomp`` / ``ec`` aliases
+remain for convenience):
 
 .. code-block:: bash
 
-    # Compress an alignment (auto-detect output names)
-    ec compress data/alignment.fasta
+    # Zip an alignment (auto-detect output names)
+    codex zip data/alignment.fasta
 
     # Supply a tree only for sequence ordering (tree is NOT stored)
-    ec compress data/alignment.fasta --tree data/alignment.fasta.tre
+    codex zip data/alignment.fasta --tree data/alignment.fasta.tre
 
 eComp now checks a few alignment heuristics (gap density, relative composition
 variability, and pairwise identity spread) before using the tree ordering.  If
 the data look noisy, it falls back to the similarity-based reorder automatically;
 set ``ECOMP_SEQUENCE_ORDER=tree`` to force tree usage when you know it is safe.
 
-    # Decompress back to FASTA (auto-picks .fasta extension)
-    ec decompress data/alignment.ecomp
+    # Unzip back to FASTA (auto-picks .fasta extension)
+    codex unzip data/alignment.ecomp
 
     # Inspect metadata without full decompression
-    ec inspect data/alignment.ecomp --summary
+    codex inspect data/alignment.ecomp --summary
+
+    # Alignment diagnostics (aliases mirror PhyKIT-style shorthand)
+    codex consensus_sequence data/alignment.ecomp
+    codex column_base_counts data/alignment.ecomp
+    codex gap_fraction data/alignment.ecomp
+    codex shannon_entropy data/alignment.ecomp
+    codex parsimony_informative_sites data/alignment.ecomp
+    codex constant_columns data/alignment.ecomp
+    codex pairwise_identity data/alignment.ecomp
+    codex alignment_length_excluding_gaps data/alignment.ecomp
+    codex alignment_compressed_length data/alignment.ecomp
+    codex variable_sites data/alignment.ecomp
+    codex percentage_identity data/alignment.ecomp
+    codex relative_composition_variability data/alignment.ecomp
 
 To forward arguments explicitly (for example, to choose an output name):
 
 .. code-block:: bash
 
-    ec compress alignment.fa --tree alignment.fa.tre \
+    codex zip alignment.fa --tree alignment.fa.tre \
         -o results/alignment.ecomp -m results/alignment.json
-    ec decompress results/alignment.ecomp -m results/alignment.json -o restored.fa
+    codex unzip results/alignment.ecomp -m results/alignment.json -o restored.fa
 
 Python API
 ----------

@@ -12,11 +12,11 @@ Use your shell's timing utility to compare eComp to other codecs:
 
 .. code-block:: bash
 
-    /usr/bin/time -p ecomp compress data/fixtures/small_phylo.fasta \
+    /usr/bin/time -p codex zip data/fixtures/small_phylo.fasta \
         --output out.ecomp
     /usr/bin/time -p gzip -k data/fixtures/small_phylo.fasta
 
-The ``ecomp`` command prints archive size and compression ratio; record the wall
+The ``codex`` command prints archive size and compression ratio; record the wall
 clock figures reported by ``time`` for performance tracking.
 
 Decompression checks
@@ -26,7 +26,7 @@ Always validate the round trip after timing a run:
 
 .. code-block:: bash
 
-    ecomp decompress out.ecomp --output restored.fasta
+    codex unzip out.ecomp --output restored.fasta
     diff -u data/fixtures/small_phylo.fasta restored.fasta
 
 Supplementary data

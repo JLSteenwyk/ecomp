@@ -1,5 +1,5 @@
-from evolutionary_compression.io import alignment_from_sequences
-from evolutionary_compression.compression.consensus import collect_column_profiles
+from ecomp.io import alignment_from_sequences
+from ecomp.compression.consensus import collect_column_profiles
 
 
 def test_collect_column_profiles_identifies_consensus_and_deviations():

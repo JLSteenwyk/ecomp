@@ -53,6 +53,99 @@ column, whereas gzip/bzip2 still allocate bytes for every residue in every
 sequence. On real MSAs (thousands of taxa × columns) this structural awareness
 translates into 2–3× better compression versus canonical codecs.
 
+### How the Toy Alignment Is Stored
+
+To see the storage format end to end, consider this 3x8 alignment:
+
+```
+>seq1
+ACGTACGA
+>seq2
+ACGTTCGA
+>seq3
+ACGTACGG
+```
+
+- **Sequence ordering**: eComp may permute sequences to cluster similar rows.
+  Here the input order is already good, so no permutation needs to be written.
+
+- **Column modelling**: each column becomes a consensus residue plus a mask of
+  which sequences deviate. The mask uses the order `(seq1, seq2, seq3)` where a
+  `1` marks a deviation and the payload column lists those explicit residues.
+
+| Column | Residues (seq1/seq2/seq3) | Consensus | Deviation mask | Payload |
+|--------|---------------------------|-----------|----------------|---------|
+| 1      | A/A/A                     | A         | 000            | -       |
+| 2      | C/C/C                     | C         | 000            | -       |
+| 3      | G/G/G                     | G         | 000            | -       |
+| 4      | T/T/T                     | T         | 000            | -       |
+| 5      | A/T/A                     | A         | 010            | T       |
+| 6      | C/C/C                     | C         | 000            | -       |
+| 7      | G/G/G                     | G         | 000            | -       |
+| 8      | A/A/G                     | A         | 001            | G       |
+
+- **Run-length bundling**: contiguous columns sharing the same consensus and
+  mask are merged. Columns 1–4 become a single run with length 4, columns 6–7
+  form another run of length 2, and the columns with deviations (5 and 8) are
+  stored as single-column runs.
+
+- **What gzip sees**: gzip streams the FASTA bytes exactly as they appear. Every
+  header line, newline, and residue flows into the DEFLATE encoder with no
+  column awareness. The same alignment therefore expands to 24 residue bytes
+  plus six header/newline blocks before compression kicks in.
+
+| Stream chunk | Literal bytes | Description |
+|--------------|---------------|-------------|
+| `>seq1\n`    | 6             | Header for `seq1` (leading `>` and trailing newline). |
+| `ACGTACGA\n` | 9             | Row for `seq1`; every nucleotide stays literal. |
+| `>seq2\n`    | 6             | Header for `seq2`. |
+| `ACGTTCGA\n` | 9             | Row for `seq2`; mismatch `T` is just another byte. |
+| `>seq3\n`    | 6             | Header for `seq3`. |
+| `ACGTACGG\n` | 9             | Row for `seq3`; terminal `G` stored independently. |
+
+  Adding those chunks yields 45 literal bytes before DEFLATE coding.
+
+- **Binary layout**: the `.ecomp` payload records the sequence dictionary, the
+  consensus stream (`ACGTACGA`), the deviation bitmasks (`0000 010 00 001`), the
+  payload residues (`T` and `G`), and run-length counters (4,1,2,1). Only after
+  these structures are assembled does eComp hand the compact stream to zstd
+  (or another backend) for generic compression. The companion JSON stores the
+  alignment dimensions, alphabet, checksum, backend codec, and the no-op
+  permutation so the decompressor can rebuild the exact FASTA.
+
+  Those structures total eight consensus bytes, two deviation bytes, and four
+  run-length integers before the backend codec—around one third of the literal
+  payload gzip must stream.
+
+Compared with gzip, which must repeat every residue and header verbatim, eComp
+stores the consensus once, notes the sparse deviations, and reuses run lengths
+to avoid re-emitting conserved columns. Even this toy alignment shrinks from 24
+characters down to a handful of bytes before the final backend compression is
+applied.
+
+### Comparing Archive Layouts (gzip vs. eComp)
+
+```
+alignment.fasta          # source file (FASTA or PHYLIP)
+
+# gzip
+alignment.fasta.gz       # single compressed stream, no extra metadata
+
+# eComp
+alignment.ecomp          # binary payload with consensus + run-length stream
+alignment.json           # metadata sidecar (alignment stats, checksums, ordering)
+```
+
+gzip serializes the raw FASTA bytes and applies DEFLATE; decompression restores
+exactly the original text but requires no added structure awareness. eComp first
+reorders sequences (if beneficial), factors columns into consensus models, packs
+deviations, and only then applies a general-purpose backend (zstd/zlib/xz). The
+payload lives in `alignment.ecomp`, while `alignment.json` records everything
+needed to reconstruct the alignment (dimensions, alphabet, permutation, checksum
+and payload codec). Together these two files guarantee a lossless round trip
+even when the compressor chooses different ordering or encoding strategies per
+dataset.
+
 ## Quickstart
 ```bash
 python3 -m venv venv --system-site-packages  # or omit flag if you can install deps
@@ -65,21 +158,35 @@ pip install .[dev]
 > dev tools (`pytest`, `ruff`, `black`, `mypy`, etc.) are provisioned manually.
 
 ## CLI Usage
-# The CLI is available as both `ecomp` and the shorter alias `ec`.
+# The CLI is available as `codex` (legacy aliases: `ecomp`, `ec`).
 ```bash
-# Compress an alignment (writes example.ecomp + metadata JSON)
-ec compress example.fasta
+# Zip an alignment (writes example.ecomp + metadata JSON)
+codex zip example.fasta
 
 # Optionally supply a tree to guide ordering (tree is not stored)
-ec compress example.fasta --tree example.tree
+codex zip example.fasta --tree example.tree
 
-# Decompress (auto-detects codec from metadata)
-ec decompress example.ecomp --alignment-output restored.fasta
+# Unzip (auto-detects codec from metadata)
+codex unzip example.ecomp --alignment-output restored.fasta
 
 # Inspect metadata (JSON or short summary)
-ec inspect example.ecomp --summary
+codex inspect example.ecomp --summary
+
+# Alignment diagnostics (Phykit-style names with short aliases)
+codex consensus_sequence example.ecomp             # alias: ec con_seq
+codex column_base_counts example.ecomp             # alias: ec col_counts
+codex gap_fraction example.ecomp                   # alias: ec gap_frac
+codex shannon_entropy example.ecomp                # alias: ec entropy
+codex parsimony_informative_sites example.ecomp    # alias: ec parsimony
+codex constant_columns example.ecomp               # alias: ec const_cols
+codex pairwise_identity example.ecomp              # alias: ec pid
+codex alignment_length_excluding_gaps example.ecomp    # alias: ec len_no_gaps
+codex alignment_compressed_length example.ecomp        # alias: ec compressed_len
+codex variable_sites example.ecomp                     # alias: ec var_sites
+codex percentage_identity example.ecomp                # alias: ec pct_id
+codex relative_composition_variability example.ecomp   # alias: ec rcv
 ```
-The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment`, `decompress_alignment`).
+The `codex` entry point mirrors the public Python API (`compress_file`, `decompress_file`, `compress_alignment`, `decompress_alignment`).
 
 ## Development Workflow
 - Run the fast test suite (unit + non-slow integration):
@@ -113,7 +220,7 @@ The `ecomp` entry point mirrors the public Python API (`compress_file`, `decompr
 Use the CLI together with standard timing tools to compare eComp to other
 codecs. A quick local comparison works with the bundled fixture:
 ```bash
-/usr/bin/time -p ecomp compress data/fixtures/small_phylo.fasta \
+/usr/bin/time -p codex zip data/fixtures/small_phylo.fasta \
   --output out.ecomp
 /usr/bin/time -p gzip -k data/fixtures/small_phylo.fasta
 ```

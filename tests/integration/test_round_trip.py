@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from evolutionary_compression import compress_file, decompress_file, read_alignment
+from ecomp import compress_file, decompress_file, read_alignment
 
 
 FASTA_CONTENT = ">seq1\nACGTACGT\n>seq2\nACGTTCGT\n>seq3\nACGTACGA\n"

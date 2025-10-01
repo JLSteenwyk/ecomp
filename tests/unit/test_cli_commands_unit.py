@@ -1,9 +1,11 @@
 import json
 from pathlib import Path
 
-from evolutionary_compression.cli import main as ecomp_main
-from evolutionary_compression.io import read_alignment
-from evolutionary_compression.storage import read_metadata, write_metadata
+import pytest
+
+from ecomp.cli import main as ecomp_main
+from ecomp.io import read_alignment
+from ecomp.storage import read_archive, write_archive
 
 FASTA_CONTENT = ">tax1\nACGTACGT\n>tax2\nACGTTCGT\n"
 TREE_CONTENT = "(tax1:0.1,tax2:0.2);\n"
@@ -32,6 +34,8 @@ def test_cli_happy_path_round_trip(tmp_path, capsys):
     compress_out = capsys.readouterr().out
     assert "Created" in compress_out
     assert "Stats:" in compress_out
+
+    assert "Metadata copy" in compress_out
 
     assert archive.exists() and metadata.exists()
 
@@ -81,12 +85,9 @@ def test_cli_decompress_no_checksum_allows_mismatch(tmp_path, capsys):
         "--stats",
     ]) == 0
     archive = alignment.with_suffix(".ecomp")
-    metadata = alignment.with_suffix(".json")
-
-    # Corrupt checksum to ensure --no-checksum takes the skip branch
-    meta = read_metadata(metadata)
-    meta["checksum_sha256"] = "deadbeef"
-    write_metadata(metadata, meta)
+    payload, metadata, _ = read_archive(archive)
+    metadata["checksum_sha256"] = "deadbeef"
+    write_archive(archive, payload, metadata)
 
     capsys.readouterr()
     assert ecomp_main([
@@ -104,3 +105,79 @@ def test_cli_decompress_no_checksum_allows_mismatch(tmp_path, capsys):
     assert ecomp_main(["inspect", str(archive)]) == 0
     metadata_json = json.loads(capsys.readouterr().out)
     assert metadata_json["ordering_strategy"]
+
+
+def test_cli_zip_raises_when_alignment_missing(tmp_path):
+    missing = tmp_path / "missing.fasta"
+    with pytest.raises(SystemExit, match="Alignment not found"):
+        ecomp_main(["zip", str(missing)])
+
+
+def test_cli_zip_raises_when_tree_missing(tmp_path):
+    alignment = tmp_path / "toy.fasta"
+    _write_alignment(alignment)
+    with pytest.raises(SystemExit, match="Tree file not found"):
+        ecomp_main([
+            "zip",
+            str(alignment),
+            "--tree",
+            str(tmp_path / "nope.tree"),
+        ])
+
+
+def test_cli_zip_raises_when_tree_unreadable(tmp_path):
+    alignment = tmp_path / "toy.fasta"
+    _write_alignment(alignment)
+    bad_tree = tmp_path / "bad.tree"
+    bad_tree.mkdir()
+    with pytest.raises(SystemExit, match="Failed to read tree file"):
+        ecomp_main([
+            "zip",
+            str(alignment),
+            "--tree",
+            str(bad_tree),
+        ])
+
+
+def test_cli_inspect_raises_when_archive_missing(tmp_path):
+    with pytest.raises(SystemExit, match="Archive not found"):
+        ecomp_main(["inspect", str(tmp_path / "ghost.ecomp")])
+
+
+def test_cli_alignment_length_alias(tmp_path, capsys):
+    alignment = tmp_path / "toy.fasta"
+    alignment.write_text(">s1\nAC--\n>s2\nACGT\n")
+    archive = tmp_path / "toy.ecomp"
+    assert ecomp_main([
+        "zip",
+        str(alignment),
+        "-o",
+        str(archive),
+    ]) == 0
+    capsys.readouterr()
+
+    assert ecomp_main([
+        "alignment_length_excluding_gaps",
+        str(archive),
+    ]) == 0
+    assert capsys.readouterr().out.strip() == "4"
+
+    assert ecomp_main([
+        "alignment_compressed_length",
+        str(archive),
+    ]) == 0
+    assert capsys.readouterr().out.strip().isdigit()
+
+    assert ecomp_main([
+        "compressed_len",
+        str(archive),
+        "--no-checksum",
+    ]) == 0
+    assert capsys.readouterr().out.strip().isdigit()
+
+    assert ecomp_main([
+        "len_no_gaps",
+        str(archive),
+        "--no-checksum",
+    ]) == 0
+    assert capsys.readouterr().out.strip() == "4"

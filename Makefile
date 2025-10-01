@@ -17,13 +17,13 @@ install:
 	pip install .[dev]
 
 lint:
-	ruff check src tests
-	black --check src tests
-	isort --check-only src tests
+	ruff check ecomp tests
+	black --check ecomp tests
+	isort --check-only ecomp tests
 
 format:
-	black src tests
-	isort src tests
+	black ecomp tests
+	isort ecomp tests
 
 test: test.unit test.integration
 
@@ -40,14 +40,14 @@ test.integration:
 test.coverage: coverage.unit coverage.integration
 
 coverage.unit:
-	python -m pytest --cov=evolutionary_compression --cov-report=xml:unit.coverage.xml -m "not integration"
+	python -m pytest --cov=ecomp --cov-report=xml:unit.coverage.xml -m "not integration"
 
 coverage.integration:
-	python -m pytest --cov=evolutionary_compression --cov-report=xml:integration.coverage.xml -m "integration"
+	python -m pytest --cov=ecomp --cov-report=xml:integration.coverage.xml -m "integration"
 
 bench:
 	@echo "Run CLI benchmarks with:"
-	@echo "  /usr/bin/time -p ecomp compress data/fixtures/small_phylo.fasta --output out.ecomp"
+	@echo "  /usr/bin/time -p codex zip data/fixtures/small_phylo.fasta --output out.ecomp"
 	@echo "Compare the timing and archive sizes against gzip, bzip2, or xz as needed."
 
 docs:
