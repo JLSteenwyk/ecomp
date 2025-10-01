@@ -12,7 +12,7 @@ programmatic usage.
 :raw-html:`<br />`
 
 Installation
-============
+------------
 
 .. code-block:: bash
 
@@ -30,7 +30,7 @@ Installation
 :raw-html:`<br />`
 
 CLI Usage Overview
-==================
+------------------
 
 The ``ecomp`` command exposes compression, decompression, inspection, and
 PhyKIT-style diagnostics. Short aliases (mirroring the CLI verbs) are shown in
@@ -65,13 +65,12 @@ parentheses.
 :raw-html:`<br />`
 
 Python API Highlight
-====================
+--------------------
 
 All CLI behaviour is accessible via ``ecomp``. Core helpers are grouped below for
 quick reference (see :doc:`api` for full details).
 
-File-based workflow
--------------------
+**File-based workflow**
 
 .. code-block:: python
 
@@ -97,8 +96,9 @@ File-based workflow
     print(f"Mean pairwise identity: {pct_identity:.2f}%")
     print(f"Column counts for column 1: {base_counts[0]}")
 
-In-memory usage
----------------
+:raw-html:`<br />`
+
+**In-memory usage**
 
 .. code-block:: python
 
