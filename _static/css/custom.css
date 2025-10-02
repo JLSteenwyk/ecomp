@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&family=Roboto+Mono:wght@300;400;500&display=swap');
+
+:root {
+  --font-family-base: 'Lato', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-family-code: 'Roboto Mono', Menlo, 'DejaVu Sans Mono', monospace;
+}
+
+body,
+.wy-nav-content,
+.rst-content,
+.wy-menu-vertical {
+  font-family: var(--font-family-base);
+}
+
+.rst-content code,
+.rst-content tt,
+.highlight pre,
+.rst-content pre,
+code {
+  font-family: var(--font-family-code);
+}
+
+.sidebar-top {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  align-items: flex-end;
+  margin-bottom: 1rem;
+}
+
+.sidebar-top img.sidebar-logo {
+  max-width: 120px;
+  height: auto;
+}
+
+.sidebar-top .sidebar-links {
+  font-size: 0.85rem;
+  text-align: right;
+  display: flex;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.sidebar-top .sidebar-links a {
+  color: var(--color-sidebar-link, #2c3e50);
+  text-decoration: none;
+}
+
+.sidebar-top .sidebar-links a:hover {
+  text-decoration: underline;
+}
