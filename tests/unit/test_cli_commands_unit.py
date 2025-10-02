@@ -1,9 +1,22 @@
 import json
+import math
 from pathlib import Path
 
 import pytest
 
 from ecomp.cli import main as ecomp_main
+from ecomp.diagnostics.metrics import (
+    column_base_counts as metrics_column_base_counts,
+    column_gap_fraction as metrics_column_gap_fraction,
+    column_shannon_entropy as metrics_column_shannon_entropy,
+    constant_columns as metrics_constant_columns,
+    majority_rule_consensus,
+    pairwise_identity_matrix,
+    parsimony_informative_columns,
+    percentage_identity as metrics_percentage_identity,
+    relative_composition_variability,
+    variable_site_count as metrics_variable_site_count,
+)
 from ecomp.io import read_alignment
 from ecomp.storage import read_archive, write_archive
 
@@ -181,3 +194,151 @@ def test_cli_alignment_length_alias(tmp_path, capsys):
         "--no-checksum",
     ]) == 0
     assert capsys.readouterr().out.strip() == "4"
+
+
+def test_cli_metric_subcommands(tmp_path, capsys):
+    alignment = tmp_path / "metrics.fasta"
+    alignment.write_text(">s1\nACGT\n>s2\nA-GT\n>s3\nATGT\n")
+    archive = tmp_path / "metrics.ecomp"
+
+    assert ecomp_main([
+        "zip",
+        str(alignment),
+        "-o",
+        str(archive),
+    ]) == 0
+    capsys.readouterr()
+
+    frame = read_alignment(alignment)
+
+    assert ecomp_main([
+        "consensus_sequence",
+        str(archive),
+        "--header",
+        "metric_consensus",
+    ]) == 0
+    consensus_output = capsys.readouterr().out.strip().splitlines()
+    assert consensus_output == [">metric_consensus", majority_rule_consensus(frame)]
+
+    assert ecomp_main([
+        "column_base_counts",
+        str(archive),
+        "--include-gaps",
+        "--indent",
+        "0",
+    ]) == 0
+    counts_output = json.loads(capsys.readouterr().out)
+    expected_counts = [
+        {"column": idx + 1, "counts": dict(counter)}
+        for idx, counter in enumerate(
+            metrics_column_base_counts(frame, include_gaps=True)
+        )
+    ]
+    assert counts_output == expected_counts
+
+    assert ecomp_main([
+        "gap_fraction",
+        str(archive),
+    ]) == 0
+    gap_lines = capsys.readouterr().out.strip().splitlines()
+    expected_gap = metrics_column_gap_fraction(frame)
+    for idx, line in enumerate(gap_lines, start=1):
+        column, value = line.split("\t")
+        assert int(column) == idx
+        assert value == f"{expected_gap[idx - 1]:.6f}"
+
+    assert ecomp_main([
+        "shannon_entropy",
+        str(archive),
+    ]) == 0
+    entropy_lines = capsys.readouterr().out.strip().splitlines()
+    expected_entropy = metrics_column_shannon_entropy(frame)
+    for idx, line in enumerate(entropy_lines, start=1):
+        column, value = line.split("\t")
+        assert int(column) == idx
+        assert value == f"{expected_entropy[idx - 1]:.6f}"
+
+    assert ecomp_main([
+        "parsimony_informative_sites",
+        str(archive),
+    ]) == 0
+    parsimony_lines = capsys.readouterr().out.strip().splitlines()
+    parsimony_mask = parsimony_informative_columns(frame)
+    total_parsimony = sum(parsimony_mask)
+    assert parsimony_lines[0] == f"total\t{total_parsimony}"
+    if total_parsimony:
+        expected_indices = " ".join(
+            str(idx + 1) for idx, value in enumerate(parsimony_mask) if value
+        )
+        assert parsimony_lines[1] == f"indices\t{expected_indices}"
+    else:
+        assert len(parsimony_lines) == 1
+
+    assert ecomp_main([
+        "constant_columns",
+        str(archive),
+    ]) == 0
+    constant_lines = capsys.readouterr().out.strip().splitlines()
+    constant_mask = metrics_constant_columns(frame)
+    total_constant = sum(1 for value in constant_mask if value)
+    assert constant_lines[0] == f"total\t{total_constant}"
+    if total_constant:
+        expected_indices = " ".join(
+            str(idx + 1) for idx, value in enumerate(constant_mask) if value
+        )
+        assert constant_lines[1] == f"indices\t{expected_indices}"
+
+    assert ecomp_main([
+        "pairwise_identity",
+        str(archive),
+    ]) == 0
+    pairwise_lines = capsys.readouterr().out.strip().splitlines()
+    result = pairwise_identity_matrix(frame)
+    ids = frame.ids
+    assert pairwise_lines[0].split("\t") == ["id", *ids]
+    for row_index, line in enumerate(pairwise_lines[1 : 1 + len(ids)]):
+        parts = line.split("\t")
+        assert parts[0] == ids[row_index]
+        expected = [
+            "nan" if math.isnan(value) else f"{value:.6f}"
+            for value in result.matrix[row_index]
+        ]
+        assert parts[1:] == expected
+
+    coverage_offset = 1 + len(ids)
+    assert pairwise_lines[coverage_offset] == "# coverage"
+    assert pairwise_lines[coverage_offset + 1].split("\t") == ["id", *ids]
+    for row_index, line in enumerate(
+        pairwise_lines[coverage_offset + 2 : coverage_offset + 2 + len(ids)]
+    ):
+        parts = line.split("\t")
+        assert parts[0] == ids[row_index]
+        assert parts[1:] == [str(value) for value in result.coverage[row_index]]
+
+    assert ecomp_main([
+        "variable_sites",
+        str(archive),
+    ]) == 0
+    variable_output = capsys.readouterr().out.strip()
+    assert variable_output == str(metrics_variable_site_count(frame))
+
+    assert ecomp_main([
+        "percentage_identity",
+        str(archive),
+    ]) == 0
+    percentage_output = capsys.readouterr().out.strip()
+    expected_percentage = metrics_percentage_identity(frame)
+    expected_percentage_str = (
+        "nan"
+        if math.isnan(expected_percentage)
+        else f"{expected_percentage:.6f}"
+    )
+    assert percentage_output == expected_percentage_str
+
+    assert ecomp_main([
+        "rcv",
+        str(archive),
+    ]) == 0
+    rcv_output = capsys.readouterr().out.strip()
+    expected_rcv = relative_composition_variability(frame)
+    assert rcv_output == f"{expected_rcv:.6f}"
