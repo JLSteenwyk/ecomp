@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 from typing import Iterable
 
+from ._compat import zip_strict
 from .compression.pipeline import compress_alignment, decompress_alignment
 from .config import DEFAULT_OUTPUT_FORMAT
 from .diagnostics.checksums import alignment_checksum
@@ -558,7 +559,7 @@ def _cmd_pairwise_identity(args: argparse.Namespace) -> int:
     ids = frame.ids
     header = "\t".join(["id", *ids])
     print(header)
-    for seq_id, row in zip(ids, result.matrix, strict=True):
+    for seq_id, row in zip_strict(ids, result.matrix):
         formatted = [
             "nan" if math.isnan(value) else f"{value:.6f}"
             for value in row
@@ -567,7 +568,7 @@ def _cmd_pairwise_identity(args: argparse.Namespace) -> int:
 
     print("# coverage")
     print(header)
-    for seq_id, row in zip(ids, result.coverage, strict=True):
+    for seq_id, row in zip_strict(ids, result.coverage):
         print("\t".join([seq_id, *[str(value) for value in row]]))
     return 0
 

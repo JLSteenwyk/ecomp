@@ -10,8 +10,9 @@ import math
 import os
 import time
 import zlib
-from .._compat import dataclass
 from typing import Any, Iterable, List, Sequence, Tuple
+
+from .._compat import dataclass, zip_strict
 
 from ..diagnostics.checksums import alignment_checksum
 from ..io import AlignmentFrame, alignment_from_sequences
@@ -862,7 +863,7 @@ def decompress_alignment(payload: bytes, metadata: dict[str, Any]) -> AlignmentF
             )
             for seq_list in sequences:
                 seq_list[column_index] = consensus
-            for seq_index, residue in zip(residue_indices, residues, strict=True):
+            for seq_index, residue in zip_strict(residue_indices, residues):
                 sequences[seq_index][column_index] = residue
             column_index += 1
 
@@ -934,7 +935,7 @@ def _decode_residues(
 
 def _alignment_to_fasta_bytes(frame: AlignmentFrame) -> bytes:
     buffer = io.StringIO()
-    for seq_id, sequence in zip(frame.ids, frame.sequences, strict=True):
+    for seq_id, sequence in zip_strict(frame.ids, frame.sequences):
         buffer.write(f">{seq_id}\n{sequence}\n")
     return buffer.getvalue().encode("utf-8")
 

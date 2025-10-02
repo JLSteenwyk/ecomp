@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import heapq
 import math
 import struct
-import heapq
 from collections import Counter
 from typing import Any, Sequence
 
 from .rle import RunLengthBlock
+from .._compat import zip_strict
 
 BLOCK_HEADER_STRUCT = ">BBB"
 BLOCK_HEADER_SIZE = struct.calcsize(BLOCK_HEADER_STRUCT)
@@ -88,7 +89,7 @@ def encode_blocks(
         }
 
     prepared_blocks: list[RunLengthBlock] = []
-    for block, chars in zip(blocks, block_residue_chars, strict=True):
+    for block, chars in zip_strict(blocks, block_residue_chars):
         if not chars:
             encoded_residues = b""
         else:
@@ -140,7 +141,7 @@ def encode_blocks(
         payload.extend(residues)
 
     payload.extend(struct.pack(">I", len(prepared_blocks)))
-    for block, encoded in zip(prepared_blocks, encoded_bitmasks, strict=True):
+    for block, encoded in zip_strict(prepared_blocks, encoded_bitmasks):
         if not (1 <= block.run_length <= 255):
             raise EncodingError("Run length must be within 1..255 for encoding")
         key = (block.consensus, block.bitmask, block.residues)
@@ -644,7 +645,7 @@ def _build_dictionary(
     residue_len_lookup: dict[tuple[str, bytes, bytes], int] = {}
     bitmask_lookup: dict[tuple[str, bytes, bytes], bytes] = {}
 
-    for block, encoded in zip(blocks, encoded_bitmasks, strict=True):
+    for block, encoded in zip_strict(blocks, encoded_bitmasks):
         key = (block.consensus, block.bitmask, block.residues)
         counter[key] += block.run_length
         if key not in info_lookup:

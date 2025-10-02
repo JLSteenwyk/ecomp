@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from collections import Counter
-from .._compat import dataclass
 from typing import Iterator
+
+from .._compat import dataclass, zip_strict
 
 from ..io import AlignmentFrame
 
@@ -27,7 +28,7 @@ def iter_column_profiles(frame: AlignmentFrame) -> Iterator[ColumnProfile]:
     if not sequences:
         return
 
-    for column in zip(*sequences, strict=True):
+    for column in zip_strict(*sequences):
         counts = Counter(column)
         consensus_char = max(counts.items(), key=lambda item: (item[1], -ord(item[0])))[0]
         deviations = tuple(

@@ -12,7 +12,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from .config import DEFAULT_OUTPUT_FORMAT, detect_format_from_suffix
-from ._compat import dataclass
+from ._compat import dataclass, zip_strict
 
 
 @dataclass(slots=True)
@@ -50,7 +50,7 @@ class AlignmentFrame:
 def _to_alignment(frame: AlignmentFrame) -> MultipleSeqAlignment:
     records = [
         SeqRecord(Seq(seq), id=seq_id, description=str(frame.metadata.get("description", "")))
-        for seq_id, seq in zip(frame.ids, frame.sequences, strict=True)
+        for seq_id, seq in zip_strict(frame.ids, frame.sequences)
     ]
     return MultipleSeqAlignment(records)
 

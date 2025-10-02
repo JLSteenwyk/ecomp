@@ -7,6 +7,7 @@ from collections import Counter
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
+from .._compat import zip_strict
 from ..io import AlignmentFrame
 
 DEFAULT_GAP_CHARACTERS = {"-"}
@@ -52,7 +53,7 @@ def column_base_counts(
 
     gap_chars = set(gap_characters or DEFAULT_GAP_CHARACTERS)
     counts: list[Counter[str]] = []
-    for column in zip(*frame.sequences, strict=True):
+    for column in zip_strict(*frame.sequences):
         if include_gaps:
             counts.append(Counter(column))
         else:
@@ -79,7 +80,7 @@ def majority_rule_consensus(
     ordering_index = {char: idx for idx, char in enumerate(ordering)}
     consensus: list[str] = []
 
-    for column in zip(*frame.sequences, strict=True):
+    for column in zip_strict(*frame.sequences):
         counter = Counter(char for char in column if char not in gap_chars)
         if not counter:
             consensus.append(gap_placeholder)
@@ -119,7 +120,7 @@ def column_gap_fraction(
     gap_chars = set(gap_characters or DEFAULT_GAP_CHARACTERS)
     total = frame.num_sequences
     fractions: list[float] = []
-    for column in zip(*frame.sequences, strict=True):
+    for column in zip_strict(*frame.sequences):
         gap_count = sum(1 for char in column if char in gap_chars)
         fractions.append(gap_count / total)
     return fractions
@@ -207,7 +208,7 @@ def pairwise_identity_matrix(
     matches = [[0] * n for _ in range(n)]
     coverage = [[0] * n for _ in range(n)]
 
-    columns = zip(*sequences, strict=True)
+    columns = zip_strict(*sequences)
     for column in columns:
         for i in range(n):
             residue_i = column[i]
@@ -247,7 +248,11 @@ def alignment_length_excluding_gaps(
     """Number of columns that contain at least one non-gap character."""
 
     gap_chars = set(gap_characters or DEFAULT_GAP_CHARACTERS)
-    return sum(1 for column in zip(*frame.sequences, strict=True) if any(char not in gap_chars for char in column))
+    return sum(
+        1
+        for column in zip_strict(*frame.sequences)
+        if any(char not in gap_chars for char in column)
+    )
 
 
 def variable_site_count(
@@ -259,7 +264,7 @@ def variable_site_count(
 
     gap_chars = set(gap_characters or DEFAULT_GAP_CHARACTERS)
     variable = 0
-    for column in zip(*frame.sequences, strict=True):
+    for column in zip_strict(*frame.sequences):
         residues = {char for char in column if char not in gap_chars}
         if len(residues) >= 2:
             variable += 1
@@ -275,7 +280,7 @@ def alignment_compressed_length(
 
     gap_chars = set(gap_characters or DEFAULT_GAP_CHARACTERS)
     variable = 0
-    for column in zip(*frame.sequences, strict=True):
+    for column in zip_strict(*frame.sequences):
         residues = [char for char in column if char not in gap_chars]
         if not residues:
             continue
