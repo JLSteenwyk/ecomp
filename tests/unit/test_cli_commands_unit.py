@@ -170,23 +170,23 @@ def test_cli_alignment_length_alias(tmp_path, capsys):
     capsys.readouterr()
 
     assert ecomp_main([
+        "alignment_length",
+        str(archive),
+    ]) == 0
+    assert capsys.readouterr().out.strip() == "4"
+
+    assert ecomp_main([
         "alignment_length_excluding_gaps",
         str(archive),
     ]) == 0
     assert capsys.readouterr().out.strip() == "4"
 
     assert ecomp_main([
-        "alignment_compressed_length",
-        str(archive),
-    ]) == 0
-    assert capsys.readouterr().out.strip().isdigit()
-
-    assert ecomp_main([
-        "compressed_len",
+        "len_total",
         str(archive),
         "--no-checksum",
     ]) == 0
-    assert capsys.readouterr().out.strip().isdigit()
+    assert capsys.readouterr().out.strip() == "4"
 
     assert ecomp_main([
         "len_no_gaps",

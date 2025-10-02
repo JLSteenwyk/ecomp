@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
 from ecomp import _compat
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="slots require Python >= 3.10")
 def test_dataclass_sets_slots_on_modern_python(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("ecomp._compat.sys.version_info", (3, 11, 0))
 
@@ -33,6 +36,7 @@ def test_dataclass_strips_slots_on_legacy_python(monkeypatch: pytest.MonkeyPatch
     assert instance.extra == 2
 
 
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="zip(strict=...) requires Python >= 3.10")
 def test_zip_strict_modern_python(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("ecomp._compat.sys.version_info", (3, 11, 0))
 

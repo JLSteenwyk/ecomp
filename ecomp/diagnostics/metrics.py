@@ -271,22 +271,10 @@ def variable_site_count(
     return variable
 
 
-def alignment_compressed_length(
-    frame: AlignmentFrame,
-    *,
-    gap_characters: Iterable[str] | None = None,
-) -> int:
-    """Alignment length after removing columns that are constant or all gaps."""
+def alignment_length(frame: AlignmentFrame) -> int:
+    """Total alignment length in columns (gaps retained)."""
 
-    gap_chars = set(gap_characters or DEFAULT_GAP_CHARACTERS)
-    variable = 0
-    for column in zip_strict(*frame.sequences):
-        residues = [char for char in column if char not in gap_chars]
-        if not residues:
-            continue
-        if len(set(residues)) >= 2:
-            variable += 1
-    return variable
+    return frame.alignment_length
 
 
 def parsimony_informative_site_count(

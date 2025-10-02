@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from ecomp import __version__, compress_file, decompress_file, unzip, zip
+from ecomp import __version__, compress_file, decompress_file, eunzip, ezip
 from ecomp.storage import read_archive, read_metadata, write_archive
 
 
@@ -45,14 +45,14 @@ def test_version_attribute_present() -> None:
     assert __version__
 
 
-def test_zip_unzip_aliases(tmp_path: Path) -> None:
+def test_ezip_eunzip_round_trip(tmp_path: Path) -> None:
     alignment = tmp_path / "alias.fasta"
     alignment.write_text(">s1\nACGT\n>s2\nACGT\n")
 
     metadata_copy = tmp_path / "alias.json"
-    archive_path, metadata_path = zip(alignment, metadata_path=metadata_copy)
+    archive_path, metadata_path = ezip(alignment, metadata_path=metadata_copy)
     assert archive_path.exists()
     assert metadata_path.exists()
 
-    output_path = unzip(archive_path)
+    output_path = eunzip(archive_path)
     assert output_path.exists()

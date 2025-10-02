@@ -52,20 +52,13 @@ Evolution-informed lossless compression of multiple-sequence alignments (MSAs).
 From PyPI (recommended for users):
 
 ```bash
+# create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# install ecomp
 pip install ecomp
 ```
-
-From source:
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-pip install .[dev]
-```
-
-> Offline? Pre-install `biopython`, `numpy`, `bitarray`, and the dev tools
-> (`pytest`, `ruff`, `black`, `mypy`, …) inside your environment.
 
 ---
 
@@ -92,7 +85,7 @@ ecomp parsimony_informative_sites example.ecomp    # parsimony
 ecomp constant_columns example.ecomp               # const_cols
 ecomp pairwise_identity example.ecomp              # pid
 ecomp alignment_length_excluding_gaps example.ecomp    # len_no_gaps
-ecomp alignment_compressed_length example.ecomp        # compressed_len
+ecomp alignment_length example.ecomp                   # len_total
 ecomp variable_sites example.ecomp                     # var_sites
 ecomp percentage_identity example.ecomp                # pct_id
 ecomp relative_composition_variability example.ecomp   # rcv
@@ -113,14 +106,14 @@ Benchmarks mirror standard codec comparisons:
 Everything the CLI does is re-exported in `ecomp`.
 
 ```python
-from ecomp import zip, unzip, read_alignment, percentage_identity, column_base_counts
+from ecomp import ezip, eunzip, read_alignment, percentage_identity, column_base_counts
 
 # File-based workflow
-archive_path, metadata_path = zip(
+archive_path, metadata_path = ezip(
     "data/example.fasta",
     metadata_path="data/example.json",  # optional JSON copy
 )
-restored_path = unzip(archive_path, output_path="data/restored.fasta")
+restored_path = eunzip(archive_path, output_path="data/restored.fasta")
 
 # Diagnostics on an AlignmentFrame
 frame = read_alignment("data/example.fasta")
@@ -148,15 +141,15 @@ assert restored.sequences == frame.sequences
 
 ### Available functions
 
-**Compression & I/O** — `zip`, `unzip`, `compress_file`, `decompress_file`,
+**Compression & I/O** — `ezip`, `eunzip`, `compress_file`, `decompress_file`,
 `compress_alignment`, `decompress_alignment`, `read_alignment`,
 `write_alignment`, `alignment_from_sequences`, `alignment_checksum`
 
 **Diagnostics & metrics** — `column_base_counts`, `column_gap_fraction`,
 `column_shannon_entropy`, `parsimony_informative_columns`,
 `parsimony_informative_site_count`, `constant_columns`,
-`majority_rule_consensus`, `alignment_length_excluding_gaps`,
-`alignment_compressed_length`, `variable_site_count`, `percentage_identity`,
+`majority_rule_consensus`, `alignment_length`,
+`alignment_length_excluding_gaps`, `variable_site_count`, `percentage_identity`,
 `relative_composition_variability`, `pairwise_identity_matrix`
 
 **Supporting types** — `AlignmentFrame`, `CompressedAlignment`,

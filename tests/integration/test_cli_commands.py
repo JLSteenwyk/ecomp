@@ -284,11 +284,11 @@ def test_cli_metrics_commands(tmp_path: Path, capsys) -> None:
     assert len_no_gaps == "5"
 
     assert ecomp_main([
-        "alignment_compressed_length",
+        "alignment_length",
         str(archive),
     ]) == 0
-    compressed_len = capsys.readouterr().out.strip()
-    assert compressed_len == "2"
+    total_len = capsys.readouterr().out.strip()
+    assert total_len == "5"
 
     assert ecomp_main([
         "variable_sites",

@@ -14,7 +14,7 @@ from .compression.pipeline import compress_alignment, decompress_alignment
 from .config import DEFAULT_OUTPUT_FORMAT
 from .diagnostics.checksums import alignment_checksum
 from .diagnostics.metrics import (
-    alignment_compressed_length,
+    alignment_length,
     alignment_length_excluding_gaps,
     column_base_counts,
     column_gap_fraction,
@@ -201,19 +201,18 @@ def _add_alignment_length_no_gaps_arguments(
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_alignment_length_no_gaps)
-    parser.set_defaults(alias="len_no_gaps")
 
 
-def _add_alignment_compressed_length_arguments(
+def _add_alignment_length_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
     parser = subparsers.add_parser(
-        "alignment_compressed_length",
-        aliases=["compressed_len"],
-        help="Count columns remaining after removing constant and all-gap sites",
+        "alignment_length",
+        aliases=["len_total"],
+        help="Report total alignment columns including gaps",
     )
     _add_archive_options(parser)
-    parser.set_defaults(handler=_cmd_alignment_compressed_length)
+    parser.set_defaults(handler=_cmd_alignment_length)
 
 
 def _add_variable_sites_arguments(
@@ -365,7 +364,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_constant_columns_arguments(subparsers)
     _add_pairwise_identity_arguments(subparsers)
     _add_alignment_length_no_gaps_arguments(subparsers)
-    _add_alignment_compressed_length_arguments(subparsers)
+    _add_alignment_length_arguments(subparsers)
     _add_variable_sites_arguments(subparsers)
     _add_percentage_identity_arguments(subparsers)
     _add_rcv_arguments(subparsers)
@@ -583,12 +582,12 @@ def _cmd_alignment_length_no_gaps(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_alignment_compressed_length(args: argparse.Namespace) -> int:
+def _cmd_alignment_length(args: argparse.Namespace) -> int:
     archive_path, metadata_path = _resolve_archive_args(args.archive, args.metadata_path)
     frame, _ = _load_alignment_from_archive(
         archive_path, metadata_path, validate_checksum=not args.no_checksum
     )
-    length = alignment_compressed_length(frame)
+    length = alignment_length(frame)
     print(length)
     return 0
 

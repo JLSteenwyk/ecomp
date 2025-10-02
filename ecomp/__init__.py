@@ -12,7 +12,7 @@ from .storage import derive_metadata_path, read_archive, write_archive, write_me
 from .diagnostics.checksums import alignment_checksum
 from .diagnostics.metrics import (
     PairwiseIdentityResult,
-    alignment_compressed_length,
+    alignment_length,
     alignment_length_excluding_gaps,
     column_base_counts,
     column_gap_fraction,
@@ -34,8 +34,8 @@ __all__ = [
     "CompressedAlignment",
     "compress_file",
     "decompress_file",
-    "zip",
-    "unzip",
+    "ezip",
+    "eunzip",
     "compress_alignment",
     "decompress_alignment",
     "read_alignment",
@@ -49,8 +49,8 @@ __all__ = [
     "parsimony_informative_site_count",
     "constant_columns",
     "majority_rule_consensus",
+    "alignment_length",
     "alignment_length_excluding_gaps",
-    "alignment_compressed_length",
     "variable_site_count",
     "percentage_identity",
     "relative_composition_variability",
@@ -125,12 +125,12 @@ def decompress_file(
     return destination
 
 
-def zip(
+def ezip(
     input_path: str | Path,
     output_path: str | Path | None = None,
     metadata_path: str | Path | None = None,
     input_format: str | None = None,
-) -> Tuple[Path, Path]:
+) -> Tuple[Path, Path | None]:
     """Alias for :func:`compress_file` mirroring the CLI verb."""
 
     return compress_file(
@@ -141,7 +141,7 @@ def zip(
     )
 
 
-def unzip(
+def eunzip(
     ecomp_path: str | Path,
     output_path: str | Path | None = None,
     metadata_path: str | Path | None = None,

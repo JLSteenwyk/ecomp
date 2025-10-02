@@ -60,14 +60,14 @@ All CLI functionality is re-exported via ``ecomp``:
 
 .. code-block:: python
 
-   from ecomp import read_alignment, zip, unzip
+   from ecomp import read_alignment, ezip, eunzip
 
    frame = read_alignment("example.fasta")
-   archive_path, metadata_path = zip(
+   archive_path, metadata_path = ezip(
        "example.fasta",
        metadata_path="example.json",  # optional JSON sidecar
    )
-   restored_path = unzip(archive_path)
+   restored_path = eunzip(archive_path)
 
    from ecomp import percentage_identity
    pct_identity = percentage_identity(frame)

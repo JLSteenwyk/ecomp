@@ -5,7 +5,7 @@ from collections import Counter
 
 from ecomp import (
     PairwiseIdentityResult,
-    alignment_compressed_length,
+    alignment_length,
     alignment_length_excluding_gaps,
     alignment_from_sequences,
     column_base_counts,
@@ -119,9 +119,18 @@ def test_majority_rule_consensus_adds_gap_placeholder():
 
 def test_alignment_length_and_variable_sites():
     frame = _example_alignment()
+    assert alignment_length(frame) == 5
     assert alignment_length_excluding_gaps(frame) == 5
     assert variable_site_count(frame) == 2
-    assert alignment_compressed_length(frame) == 2
+
+
+def test_alignment_length_counts_gap_only_columns():
+    frame = alignment_from_sequences(
+        ["s1", "s2"],
+        ["-A", "--"],
+    )
+    assert alignment_length(frame) == 2
+    assert alignment_length_excluding_gaps(frame) == 1
 
 
 def test_column_shannon_entropy_ignores_gaps():
