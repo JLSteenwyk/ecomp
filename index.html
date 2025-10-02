@@ -116,14 +116,14 @@ ecomp<span class="w"> </span>variable_sites<span class="w"> </span>example.ecomp
 <p><span class="raw-html"><br /></span></p>
 <p><strong>API Usage</strong></p>
 <p>All CLI functionality is re-exported via <code class="docutils literal notranslate"><span class="pre">ecomp</span></code>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ecomp</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_alignment</span><span class="p">,</span> <span class="nb">zip</span><span class="p">,</span> <span class="n">unzip</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ecomp</span><span class="w"> </span><span class="kn">import</span> <span class="n">read_alignment</span><span class="p">,</span> <span class="n">ezip</span><span class="p">,</span> <span class="n">eunzip</span>
 
 <span class="n">frame</span> <span class="o">=</span> <span class="n">read_alignment</span><span class="p">(</span><span class="s2">&quot;example.fasta&quot;</span><span class="p">)</span>
-<span class="n">archive_path</span><span class="p">,</span> <span class="n">metadata_path</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span>
+<span class="n">archive_path</span><span class="p">,</span> <span class="n">metadata_path</span> <span class="o">=</span> <span class="n">ezip</span><span class="p">(</span>
     <span class="s2">&quot;example.fasta&quot;</span><span class="p">,</span>
     <span class="n">metadata_path</span><span class="o">=</span><span class="s2">&quot;example.json&quot;</span><span class="p">,</span>  <span class="c1"># optional JSON sidecar</span>
 <span class="p">)</span>
-<span class="n">restored_path</span> <span class="o">=</span> <span class="n">unzip</span><span class="p">(</span><span class="n">archive_path</span><span class="p">)</span>
+<span class="n">restored_path</span> <span class="o">=</span> <span class="n">eunzip</span><span class="p">(</span><span class="n">archive_path</span><span class="p">)</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">ecomp</span><span class="w"> </span><span class="kn">import</span> <span class="n">percentage_identity</span>
 <span class="n">pct_identity</span> <span class="o">=</span> <span class="n">percentage_identity</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>

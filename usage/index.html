@@ -124,8 +124,8 @@ ecomp<span class="w"> </span>shannon_entropy<span class="w"> </span>example.ecom
 ecomp<span class="w"> </span>parsimony_informative_sites<span class="w"> </span>example.ecomp<span class="w">    </span><span class="c1"># (parsimony)</span>
 ecomp<span class="w"> </span>constant_columns<span class="w"> </span>example.ecomp<span class="w">               </span><span class="c1"># (const_cols)</span>
 ecomp<span class="w"> </span>pairwise_identity<span class="w"> </span>example.ecomp<span class="w">              </span><span class="c1"># (pid)</span>
+ecomp<span class="w"> </span>alignment_length<span class="w"> </span>example.ecomp<span class="w">               </span><span class="c1"># (len_total)</span>
 ecomp<span class="w"> </span>alignment_length_excluding_gaps<span class="w"> </span>example.ecomp<span class="w">    </span><span class="c1"># (len_no_gaps)</span>
-ecomp<span class="w"> </span>alignment_compressed_length<span class="w"> </span>example.ecomp<span class="w">        </span><span class="c1"># (compressed_len)</span>
 ecomp<span class="w"> </span>variable_sites<span class="w"> </span>example.ecomp<span class="w">                     </span><span class="c1"># (var_sites)</span>
 ecomp<span class="w"> </span>percentage_identity<span class="w"> </span>example.ecomp<span class="w">                </span><span class="c1"># (pct_id)</span>
 ecomp<span class="w"> </span>relative_composition_variability<span class="w"> </span>example.ecomp<span class="w">   </span><span class="c1"># (rcv)</span>
@@ -146,16 +146,16 @@ runtimes. Include <code class="docutils literal notranslate"><span class="pre">-
 <p>All CLI behaviour is accessible via <code class="docutils literal notranslate"><span class="pre">ecomp</span></code>. Core helpers are grouped below for
 quick reference (see <span class="xref std std-doc">api</span> for full details).</p>
 <p><strong>File-based workflow</strong></p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ecomp</span><span class="w"> </span><span class="kn">import</span> <span class="nb">zip</span><span class="p">,</span> <span class="n">unzip</span><span class="p">,</span> <span class="n">read_alignment</span><span class="p">,</span> <span class="n">percentage_identity</span><span class="p">,</span> <span class="n">column_base_counts</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">ecomp</span><span class="w"> </span><span class="kn">import</span> <span class="n">ezip</span><span class="p">,</span> <span class="n">eunzip</span><span class="p">,</span> <span class="n">read_alignment</span><span class="p">,</span> <span class="n">percentage_identity</span><span class="p">,</span> <span class="n">column_base_counts</span>
 
 <span class="c1"># Compress an alignment file (optionally mirroring the CLI flags)</span>
-<span class="n">archive_path</span><span class="p">,</span> <span class="n">metadata_path</span> <span class="o">=</span> <span class="nb">zip</span><span class="p">(</span>
+<span class="n">archive_path</span><span class="p">,</span> <span class="n">metadata_path</span> <span class="o">=</span> <span class="n">ezip</span><span class="p">(</span>
     <span class="s2">&quot;data/example.fasta&quot;</span><span class="p">,</span>
     <span class="n">metadata_path</span><span class="o">=</span><span class="s2">&quot;data/example.json&quot;</span><span class="p">,</span>  <span class="c1"># optional JSON copy</span>
 <span class="p">)</span>
 
 <span class="c1"># Decompress, writing FASTA to disk</span>
-<span class="n">restored_path</span> <span class="o">=</span> <span class="n">unzip</span><span class="p">(</span>
+<span class="n">restored_path</span> <span class="o">=</span> <span class="n">eunzip</span><span class="p">(</span>
     <span class="n">archive_path</span><span class="p">,</span>
     <span class="n">output_path</span><span class="o">=</span><span class="s2">&quot;data/restored.fasta&quot;</span><span class="p">,</span>
 <span class="p">)</span>

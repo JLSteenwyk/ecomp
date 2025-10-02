@@ -53,8 +53,8 @@ parentheses.
    ecomp parsimony_informative_sites example.ecomp    # (parsimony)
    ecomp constant_columns example.ecomp               # (const_cols)
    ecomp pairwise_identity example.ecomp              # (pid)
+   ecomp alignment_length example.ecomp               # (len_total)
    ecomp alignment_length_excluding_gaps example.ecomp    # (len_no_gaps)
-   ecomp alignment_compressed_length example.ecomp        # (compressed_len)
    ecomp variable_sites example.ecomp                     # (var_sites)
    ecomp percentage_identity example.ecomp                # (pct_id)
    ecomp relative_composition_variability example.ecomp   # (rcv)
@@ -82,16 +82,16 @@ quick reference (see :doc:`api` for full details).
 
 .. code-block:: python
 
-    from ecomp import zip, unzip, read_alignment, percentage_identity, column_base_counts
+    from ecomp import ezip, eunzip, read_alignment, percentage_identity, column_base_counts
 
     # Compress an alignment file (optionally mirroring the CLI flags)
-    archive_path, metadata_path = zip(
+    archive_path, metadata_path = ezip(
         "data/example.fasta",
         metadata_path="data/example.json",  # optional JSON copy
     )
 
     # Decompress, writing FASTA to disk
-    restored_path = unzip(
+    restored_path = eunzip(
         archive_path,
         output_path="data/restored.fasta",
     )
