@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from .._compat import dataclass
 from typing import Dict, Iterable, Iterator, Tuple
 
 from .consensus import ColumnProfile

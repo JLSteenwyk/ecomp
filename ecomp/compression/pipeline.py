@@ -10,7 +10,7 @@ import math
 import os
 import time
 import zlib
-from dataclasses import dataclass
+from .._compat import dataclass
 from typing import Any, Iterable, List, Sequence, Tuple
 
 from ..diagnostics.checksums import alignment_checksum

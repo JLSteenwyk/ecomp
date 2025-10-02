@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from .._compat import dataclass
 from typing import Iterator
 
 from ..io import AlignmentFrame

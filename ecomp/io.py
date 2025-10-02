@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -12,6 +12,7 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from .config import DEFAULT_OUTPUT_FORMAT, detect_format_from_suffix
+from ._compat import dataclass
 
 
 @dataclass(slots=True)
