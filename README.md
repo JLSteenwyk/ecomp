@@ -24,7 +24,7 @@
         </a>
         <br />
         <a href="https://pepy.tech/badge/ecomp">
-          <img src="https://static.pepy.tech/personalized-badge/cliecompkit?period=total&units=international_system&left_color=grey&right_color=blue&left_text=PyPi%20Downloads">
+          <img src="https://static.pepy.tech/personalized-badge/ecomp?period=total&units=international_system&left_color=grey&right_color=blue&left_text=PyPi%20Downloads">
         </a>
         <!-- <a href="https://anaconda.org/bioconda/ecomp">
           <img src="https://img.shields.io/conda/dn/bioconda/ecomp?label=bioconda%20downloads" alt="Bioconda Downloads">
