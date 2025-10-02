@@ -19,19 +19,16 @@ Quick start
 
 **Installation**
 
-1. Create and activate a fresh Python environment (3.11+):
+1. Install eComp:
 
    .. code-block:: bash
 
+      # Create and activate a virtual environment (Python 3.11+)
       python3 -m venv venv
       source venv/bin/activate
 
-2. Install eComp and its development extras:
-
-   .. code-block:: bash
-
-      pip install -r requirements.txt
-      pip install .[dev]
+      # Install dependencies and eComp (runtime + developer extras)
+      pip install ecomp
 
 :raw-html:`<br />`
 

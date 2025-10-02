@@ -21,11 +21,8 @@ Installation
    source venv/bin/activate
 
    # 2) Install dependencies and eComp (runtime + developer extras)
-   pip install -r requirements.txt
-   pip install .[dev]
+   pip install ecomp
 
-   # 3) (Optional) run the fast test suite to confirm setup
-   make test.fast
 
 :raw-html:`<br />`
 
@@ -61,6 +58,17 @@ parentheses.
    ecomp variable_sites example.ecomp                     # (var_sites)
    ecomp percentage_identity example.ecomp                # (pct_id)
    ecomp relative_composition_variability example.ecomp   # (rcv)
+
+To compare the same metrics against PhyKIT on decompressed FASTA files run:
+
+.. code-block:: bash
+
+   python scripts/benchmark_metrics.py archive.ecomp \\
+       --repeat 5 --warmup 1 --json results.json --csv results.csv
+
+The helper script times each metric via ``ecomp`` (directly on the archive) and
+via ``phykit`` (on a decompressed alignment), reporting average and best
+runtimes. Include ``--json`` / ``--csv`` to emit machine-readable output.
 
 :raw-html:`<br />`
 

@@ -145,3 +145,65 @@ compressed = compress_alignment(frame)
 restored = decompress_alignment(compressed.payload, compressed.metadata)
 assert restored.sequences == frame.sequences
 ```
+
+### Available functions
+
+**Compression & I/O** — `zip`, `unzip`, `compress_file`, `decompress_file`,
+`compress_alignment`, `decompress_alignment`, `read_alignment`,
+`write_alignment`, `alignment_from_sequences`, `alignment_checksum`
+
+**Diagnostics & metrics** — `column_base_counts`, `column_gap_fraction`,
+`column_shannon_entropy`, `parsimony_informative_columns`,
+`parsimony_informative_site_count`, `constant_columns`,
+`majority_rule_consensus`, `alignment_length_excluding_gaps`,
+`alignment_compressed_length`, `variable_site_count`, `percentage_identity`,
+`relative_composition_variability`, `pairwise_identity_matrix`
+
+**Supporting types** — `AlignmentFrame`, `CompressedAlignment`,
+`PairwiseIdentityResult`, `__version__`
+
+---
+
+## Development
+
+```bash
+make test.fast        # unit + non-slow integration tests
+make test             # full test matrix
+make lint             # lint checks (ruff, black, isort)
+make format           # auto-formatting
+mypy ecomp            # optional type checking
+```
+
+Build docs locally:
+
+```bash
+make docs
+open docs/_build/html/index.html
+```
+
+Build and publish distributions:
+
+```bash
+pip install build twine
+python -m build
+python -m twine check dist/*
+python -m twine upload dist/*
+```
+
+### Benchmarking eComp vs. PhyKIT
+
+```bash
+python scripts/benchmark_metrics.py data/example.ecomp \
+    --operations consensus shannon_entropy variable_sites \
+    --repeat 5 --warmup 1 --json results.json --csv results.csv
+```
+
+The script runs each metric via the `ecomp` CLI (on the compressed archive) and
+the corresponding `phykit` command on a decompressed alignment, then reports
+average and best runtimes. Add `--json`/`--csv` to emit machine-readable output.
+
+---
+
+## License
+
+eComp is released under the MIT License. See [`LICENSE`](LICENSE).
