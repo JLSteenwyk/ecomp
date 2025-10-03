@@ -26,6 +26,7 @@ from .diagnostics.metrics import (
     relative_composition_variability,
     variable_site_count,
 )
+from .phylo import infer_distance_tree, infer_distance_tree_from_frame, tree_to_newick
 from ._version import __version__
 
 
@@ -55,6 +56,9 @@ __all__ = [
     "percentage_identity",
     "relative_composition_variability",
     "pairwise_identity_matrix",
+    "infer_distance_tree",
+    "infer_distance_tree_from_frame",
+    "tree_to_newick",
     "PairwiseIdentityResult",
     "__version__",
 ]

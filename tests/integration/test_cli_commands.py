@@ -311,6 +311,15 @@ def test_cli_metrics_commands(tmp_path: Path, capsys) -> None:
     rcv_value = float(capsys.readouterr().out.strip())
     assert rcv_value >= 0.0
 
+    assert ecomp_main([
+        "distance_tree",
+        str(archive),
+    ]) == 0
+    tree_newick = capsys.readouterr().out.strip()
+    assert tree_newick.endswith(";")
+    for taxon in ["a", "b", "c", "d"]:
+        assert taxon in tree_newick
+
     single_alignment = tmp_path / "single.fasta"
     single_alignment.write_text(">solo\nAAAA\n")
     single_archive = single_alignment.with_suffix(".ecomp")

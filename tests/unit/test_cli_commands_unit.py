@@ -342,3 +342,24 @@ def test_cli_metric_subcommands(tmp_path, capsys):
     rcv_output = capsys.readouterr().out.strip()
     expected_rcv = relative_composition_variability(frame)
     assert rcv_output == f"{expected_rcv:.6f}"
+
+    assert ecomp_main([
+        "distance_tree",
+        str(archive),
+    ]) == 0
+    newick_output = capsys.readouterr().out.strip()
+    assert "(" in newick_output and newick_output.endswith(";")
+    assert all(seq_id in newick_output for seq_id in frame.ids)
+
+    tree_path = tmp_path / "tree.nwk"
+    assert ecomp_main([
+        "distance_tree",
+        str(archive),
+        "--method",
+        "upgma",
+        "-o",
+        str(tree_path),
+    ]) == 0
+    cli_message = capsys.readouterr().out.strip()
+    assert "Wrote Newick tree" in cli_message
+    assert tree_path.exists()

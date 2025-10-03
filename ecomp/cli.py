@@ -7,7 +7,7 @@ import json
 import math
 import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from ._compat import zip_strict
 from .compression.pipeline import compress_alignment, decompress_alignment
@@ -28,10 +28,61 @@ from .diagnostics.metrics import (
     relative_composition_variability,
     variable_site_count,
 )
+from .phylo import infer_distance_tree_from_frame, tree_to_newick
 from .io import read_alignment, write_alignment
 from .storage import derive_metadata_path, read_archive, write_archive, write_metadata
 
 ALIGNMENT_SUFFIX = ".ecomp"
+
+ASCII_BANNER = (
+    "        _____                      "\
+    "\n       / ____|                     "\
+    "\n   ___| |     ___  _ __ ___  _ __  "\
+    "\n  / _ \\ |    / _ \\| '_ ` _ \\| '_ \\ "\
+    "\n |  __/ |___| (_) | | | | | | |_) |"\
+    "\n  \\___|\\_____\\___/|_| |_| |_| .__/ "\
+    "\n                            | |    "\
+    "\n                            |_|    "
+)
+
+COMMAND_CATEGORIES = [
+    "Compression",
+    "Diagnostics",
+    "Phylogenetics",
+    "Utilities",
+]
+
+COMMAND_REGISTRY: list[dict[str, Any]] = []
+_COMMAND_COUNTER = 0
+
+
+def _attach_help_banner(parser: argparse.ArgumentParser) -> None:
+    original = parser.format_help
+
+    def _wrapped() -> str:
+        return f"{ASCII_BANNER}\n\n{original()}"
+
+    parser.format_help = _wrapped
+
+
+def _register_command(
+    *,
+    category: str,
+    name: str,
+    aliases: list[str] | None,
+    help_text: str,
+) -> None:
+    global _COMMAND_COUNTER
+    COMMAND_REGISTRY.append(
+        {
+            "category": category,
+            "name": name,
+            "aliases": aliases or [],
+            "help": help_text,
+            "order": _COMMAND_COUNTER,
+        }
+    )
+    _COMMAND_COUNTER += 1
 
 
 # ---------------------------------------------------------------------------
@@ -94,10 +145,19 @@ def _add_archive_options(parser: argparse.ArgumentParser) -> None:
 def _add_consensus_sequence_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Emit a majority-rule consensus sequence in FASTA format"
     parser = subparsers.add_parser(
         "consensus_sequence",
         aliases=["con_seq"],
-        help="Emit a majority-rule consensus sequence in FASTA format",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="consensus_sequence",
+        aliases=["con_seq"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.add_argument(
@@ -111,10 +171,19 @@ def _add_consensus_sequence_arguments(
 def _add_column_base_counts_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Report per-column residue counts as JSON"
     parser = subparsers.add_parser(
         "column_base_counts",
         aliases=["col_counts"],
-        help="Report per-column residue counts as JSON",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="column_base_counts",
+        aliases=["col_counts"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.add_argument(
@@ -134,10 +203,19 @@ def _add_column_base_counts_arguments(
 def _add_gap_fraction_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Print per-column gap fractions"
     parser = subparsers.add_parser(
         "gap_fraction",
         aliases=["gap_frac"],
-        help="Print per-column gap fractions",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="gap_fraction",
+        aliases=["gap_frac"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_gap_fraction)
@@ -146,10 +224,19 @@ def _add_gap_fraction_arguments(
 def _add_shannon_entropy_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Print per-column Shannon entropy"
     parser = subparsers.add_parser(
         "shannon_entropy",
         aliases=["entropy"],
-        help="Print per-column Shannon entropy",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="shannon_entropy",
+        aliases=["entropy"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_shannon_entropy)
@@ -158,10 +245,19 @@ def _add_shannon_entropy_arguments(
 def _add_parsimony_informative_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Identify parsimony-informative columns"
     parser = subparsers.add_parser(
         "parsimony_informative_sites",
         aliases=["parsimony"],
-        help="Identify parsimony-informative columns",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="parsimony_informative_sites",
+        aliases=["parsimony"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_parsimony_informative)
@@ -170,10 +266,19 @@ def _add_parsimony_informative_arguments(
 def _add_constant_columns_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Flag columns that are constant after removing gaps"
     parser = subparsers.add_parser(
         "constant_columns",
         aliases=["const_cols"],
-        help="Flag columns that are constant after removing gaps",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="constant_columns",
+        aliases=["const_cols"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_constant_columns)
@@ -182,10 +287,19 @@ def _add_constant_columns_arguments(
 def _add_pairwise_identity_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Report the pairwise identity matrix"
     parser = subparsers.add_parser(
         "pairwise_identity",
         aliases=["pid"],
-        help="Report the pairwise identity matrix",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="pairwise_identity",
+        aliases=["pid"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_pairwise_identity)
@@ -194,10 +308,19 @@ def _add_pairwise_identity_arguments(
 def _add_alignment_length_no_gaps_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Count alignment columns that contain at least one non-gap"
     parser = subparsers.add_parser(
         "alignment_length_excluding_gaps",
         aliases=["len_no_gaps"],
-        help="Count alignment columns that contain at least one non-gap",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="alignment_length_excluding_gaps",
+        aliases=["len_no_gaps"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_alignment_length_no_gaps)
@@ -206,10 +329,19 @@ def _add_alignment_length_no_gaps_arguments(
 def _add_alignment_length_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Report total alignment columns including gaps"
     parser = subparsers.add_parser(
         "alignment_length",
         aliases=["len_total"],
-        help="Report total alignment columns including gaps",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="alignment_length",
+        aliases=["len_total"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_alignment_length)
@@ -218,10 +350,19 @@ def _add_alignment_length_arguments(
 def _add_variable_sites_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Count sites with more than one residue ignoring gaps"
     parser = subparsers.add_parser(
         "variable_sites",
         aliases=["var_sites"],
-        help="Count sites with more than one residue ignoring gaps",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="variable_sites",
+        aliases=["var_sites"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_variable_sites)
@@ -230,10 +371,19 @@ def _add_variable_sites_arguments(
 def _add_percentage_identity_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Compute the mean pairwise identity across sequences"
     parser = subparsers.add_parser(
         "percentage_identity",
         aliases=["pct_id"],
-        help="Compute the mean pairwise identity across sequences",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="percentage_identity",
+        aliases=["pct_id"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_percentage_identity)
@@ -242,20 +392,70 @@ def _add_percentage_identity_arguments(
 def _add_rcv_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Compute the relative composition variability (RCV)"
     parser = subparsers.add_parser(
         "relative_composition_variability",
         aliases=["rcv"],
-        help="Compute the relative composition variability (RCV)",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Diagnostics",
+        name="relative_composition_variability",
+        aliases=["rcv"],
+        help_text=help_text,
     )
     _add_archive_options(parser)
     parser.set_defaults(handler=_cmd_rcv)
 
 
+def _add_distance_tree_arguments(
+    subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
+) -> None:
+    help_text = "Infer a distance-based phylogenetic tree and emit Newick"
+    parser = subparsers.add_parser(
+        "distance_tree",
+        aliases=["dist_tree"],
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Phylogenetics",
+        name="distance_tree",
+        aliases=["dist_tree"],
+        help_text=help_text,
+    )
+    _add_archive_options(parser)
+    parser.add_argument(
+        "--method",
+        choices=["nj", "upgma"],
+        default="nj",
+        help="Tree construction method to use (default: nj)",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Write the Newick tree to this path instead of stdout",
+    )
+    parser.set_defaults(handler=_cmd_distance_tree)
+
+
 def _add_zip_arguments(subparsers: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+    help_text = "Zip an alignment (optionally bundling a companion Newick tree)"
     parser = subparsers.add_parser(
         "zip",
         aliases=["compress"],
-        help="Zip an alignment (optionally bundling a companion Newick tree)",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Compression",
+        name="zip",
+        aliases=["compress"],
+        help_text=help_text,
     )
     parser.add_argument(
         "alignment",
@@ -295,10 +495,19 @@ def _add_zip_arguments(subparsers: argparse._SubParsersAction[argparse.ArgumentP
 def _add_unzip_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Restore data from an evolutionary compression archive"
     parser = subparsers.add_parser(
         "unzip",
         aliases=["decompress"],
-        help="Restore data from an evolutionary compression archive",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Compression",
+        name="unzip",
+        aliases=["decompress"],
+        help_text=help_text,
     )
     parser.add_argument("archive", help="Compressed archive produced by `ecomp zip`")
     parser.add_argument(
@@ -331,9 +540,18 @@ def _add_unzip_arguments(
 def _add_inspect_arguments(
     subparsers: argparse._SubParsersAction[argparse.ArgumentParser],
 ) -> None:
+    help_text = "Display metadata for an evolutionary compression archive"
     parser = subparsers.add_parser(
         "inspect",
-        help="Display metadata for an evolutionary compression archive",
+        help=help_text,
+        description=help_text,
+    )
+    _attach_help_banner(parser)
+    _register_command(
+        category="Utilities",
+        name="inspect",
+        aliases=[],
+        help_text=help_text,
     )
     parser.add_argument("archive", help="Archive to inspect")
     parser.add_argument(
@@ -350,11 +568,59 @@ def _add_inspect_arguments(
     parser.set_defaults(handler=_cmd_inspect)
 
 
+def _format_main_help(parser: argparse.ArgumentParser) -> str:
+    usage = f"usage: {parser.prog} <command> [options]"
+    description = parser.description or ""
+
+    lines = [ASCII_BANNER, "", usage, "", description.rstrip(), ""]
+
+    width = max(
+        (len(_command_display(entry)) for entry in COMMAND_REGISTRY),
+        default=0,
+    )
+    width = max(width, 20)
+
+    for category in COMMAND_CATEGORIES:
+        entries = [entry for entry in COMMAND_REGISTRY if entry["category"] == category]
+        if not entries:
+            continue
+        lines.append(f"{category}:")
+        for entry in sorted(entries, key=lambda item: item["order"]):
+            display = _command_display(entry)
+            help_text = entry["help"]
+            lines.append(f"  {display.ljust(width)}  {help_text}")
+        lines.append("")
+
+    option_label = "-h, --help"
+    lines.extend(
+        [
+            "General options:",
+            f"  {option_label.ljust(width)}  Show this message and exit",
+            "",
+            "Run 'ecomp <command> --help' for details on a specific command.",
+        ]
+    )
+
+    return "\n".join(line for line in lines if line is not None)
+
+
+def _command_display(entry: dict[str, Any]) -> str:
+    if entry["aliases"]:
+        alias_text = ", ".join(entry["aliases"])
+        return f"{entry['name']} ({alias_text})"
+    return entry["name"]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ecomp",
         description="Evolutionary compression toolkit for multiple sequence alignments",
+        add_help=False,
     )
+    parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS)
+    COMMAND_REGISTRY.clear()
+    global _COMMAND_COUNTER
+    _COMMAND_COUNTER = 0
     subparsers = parser.add_subparsers(dest="command", required=True)
     _add_consensus_sequence_arguments(subparsers)
     _add_column_base_counts_arguments(subparsers)
@@ -368,9 +634,11 @@ def build_parser() -> argparse.ArgumentParser:
     _add_variable_sites_arguments(subparsers)
     _add_percentage_identity_arguments(subparsers)
     _add_rcv_arguments(subparsers)
+    _add_distance_tree_arguments(subparsers)
     _add_zip_arguments(subparsers)
     _add_unzip_arguments(subparsers)
     _add_inspect_arguments(subparsers)
+    parser.format_help = lambda: _format_main_help(parser)
     return parser
 
 
@@ -622,6 +890,22 @@ def _cmd_rcv(args: argparse.Namespace) -> int:
     )
     value = relative_composition_variability(frame)
     print(f"{value:.6f}")
+    return 0
+
+
+def _cmd_distance_tree(args: argparse.Namespace) -> int:
+    archive_path, metadata_path = _resolve_archive_args(args.archive, args.metadata_path)
+    frame, _ = _load_alignment_from_archive(
+        archive_path, metadata_path, validate_checksum=not args.no_checksum
+    )
+    tree = infer_distance_tree_from_frame(frame, method=args.method)
+    newick = tree_to_newick(tree)
+    if args.output:
+        output_path = Path(args.output).expanduser().resolve()
+        output_path.write_text(newick + ("\n" if not newick.endswith("\n") else ""))
+        print(f"Wrote Newick tree to {output_path}")
+    else:
+        print(newick)
     return 0
 
 

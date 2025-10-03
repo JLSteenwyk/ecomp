@@ -89,6 +89,7 @@ ecomp alignment_length example.ecomp                   # len_total
 ecomp variable_sites example.ecomp                     # var_sites
 ecomp percentage_identity example.ecomp                # pct_id
 ecomp relative_composition_variability example.ecomp   # rcv
+ecomp distance_tree example.ecomp                     # dist_tree
 ```
 
 Benchmarks mirror standard codec comparisons:
@@ -151,6 +152,9 @@ assert restored.sequences == frame.sequences
 `majority_rule_consensus`, `alignment_length`,
 `alignment_length_excluding_gaps`, `variable_site_count`, `percentage_identity`,
 `relative_composition_variability`, `pairwise_identity_matrix`
+
+**Phylogenetics** — `infer_distance_tree`, `infer_distance_tree_from_frame`,
+`tree_to_newick`
 
 **Supporting types** — `AlignmentFrame`, `CompressedAlignment`,
 `PairwiseIdentityResult`, `__version__`

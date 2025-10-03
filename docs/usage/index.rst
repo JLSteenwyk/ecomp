@@ -58,6 +58,7 @@ parentheses.
    ecomp variable_sites example.ecomp                     # (var_sites)
    ecomp percentage_identity example.ecomp                # (pct_id)
    ecomp relative_composition_variability example.ecomp   # (rcv)
+   ecomp distance_tree example.ecomp                     # (dist_tree)
 
 To compare the same metrics against PhyKIT on decompressed FASTA files run:
 
