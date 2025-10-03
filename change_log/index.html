@@ -47,7 +47,10 @@
               <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="../about/index.html">About</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../usage/index.html">Usage</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Change Log</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Change Log</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#v0-1-0">v0.1.0</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="../other_software/index.html">Other software</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../faq/index.html">FAQ</a></li>
 </ul>
@@ -77,7 +80,20 @@
              
   <section id="change-log">
 <h1>Change Log<a class="headerlink" href="#change-log" title="Link to this heading"></a></h1>
-<p>Not applicable</p>
+<section id="v0-1-0">
+<h2>v0.1.0<a class="headerlink" href="#v0-1-0" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Renamed the public compression helpers to <code class="docutils literal notranslate"><span class="pre">ezip</span></code> / <code class="docutils literal notranslate"><span class="pre">eunzip</span></code> to avoid
+shadowing Python’s built-in <code class="docutils literal notranslate"><span class="pre">zip</span></code>.</p></li>
+<li><p>Added <code class="docutils literal notranslate"><span class="pre">alignment_length</span></code> as the canonical total column metric and removed
+the previous <code class="docutils literal notranslate"><span class="pre">alignment_compressed_length</span></code> helper.</p></li>
+<li><p>Expanded the CLI metrics suite with matching coverage tests and documentation
+updates.</p></li>
+<li><p>Hardened compatibility shims and added unit coverage for Python 3.9 support.</p></li>
+<li><p>Introduced <code class="docutils literal notranslate"><span class="pre">distance_tree</span></code> helpers (API + CLI) to infer distance-based
+trees directly from <code class="docutils literal notranslate"><span class="pre">.ecomp</span></code> archives and emit Newick output.</p></li>
+</ul>
+</section>
 </section>
 
 
