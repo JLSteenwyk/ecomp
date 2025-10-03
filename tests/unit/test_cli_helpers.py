@@ -43,3 +43,23 @@ def test_main_errors_on_missing_archive(tmp_path):
     with pytest.raises(SystemExit) as exc:
         main(["decompress", str(missing)])
     assert "Archive not found" in str(exc.value)
+
+
+def test_main_displays_help_when_no_command(capsys):
+    assert main([]) == 0
+    out = capsys.readouterr().out
+    assert "usage:" in out and "Available commands" not in out
+
+
+def test_main_lists_commands(capsys):
+    assert main(["--list-commands"]) == 0
+    output = capsys.readouterr().out
+    assert "Available commands:" in output
+    assert "Compression:" in output
+
+
+def test_main_versions_option(capsys):
+    with pytest.raises(SystemExit) as exc:
+        main(["--version"])
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip().startswith("ecomp ")

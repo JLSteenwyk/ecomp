@@ -31,6 +31,7 @@ from .diagnostics.metrics import (
 from .phylo import infer_distance_tree_from_frame, tree_to_newick
 from .io import read_alignment, write_alignment
 from .storage import derive_metadata_path, read_archive, write_archive, write_metadata
+from ._version import __version__
 
 ALIGNMENT_SUFFIX = ".ecomp"
 
@@ -54,6 +55,26 @@ COMMAND_CATEGORIES = [
 
 COMMAND_REGISTRY: list[dict[str, Any]] = []
 _COMMAND_COUNTER = 0
+
+
+def _command_column_width(min_width: int = 20) -> int:
+    width = max((len(_command_display(entry)) for entry in COMMAND_REGISTRY), default=0)
+    return max(width, min_width)
+
+
+def _build_command_lines(width: int) -> list[str]:
+    lines: list[str] = []
+    for category in COMMAND_CATEGORIES:
+        entries = [entry for entry in COMMAND_REGISTRY if entry["category"] == category]
+        if not entries:
+            continue
+        lines.append(f"{category}:")
+        for entry in sorted(entries, key=lambda item: item["order"]):
+            display = _command_display(entry)
+            help_text = entry["help"]
+            lines.append(f"  {display.ljust(width)}  {help_text}")
+        lines.append("")
+    return lines
 
 
 def _attach_help_banner(parser: argparse.ArgumentParser) -> None:
@@ -574,22 +595,9 @@ def _format_main_help(parser: argparse.ArgumentParser) -> str:
 
     lines = [ASCII_BANNER, "", usage, "", description.rstrip(), ""]
 
-    width = max(
-        (len(_command_display(entry)) for entry in COMMAND_REGISTRY),
-        default=0,
-    )
-    width = max(width, 20)
-
-    for category in COMMAND_CATEGORIES:
-        entries = [entry for entry in COMMAND_REGISTRY if entry["category"] == category]
-        if not entries:
-            continue
-        lines.append(f"{category}:")
-        for entry in sorted(entries, key=lambda item: item["order"]):
-            display = _command_display(entry)
-            help_text = entry["help"]
-            lines.append(f"  {display.ljust(width)}  {help_text}")
-        lines.append("")
+    width = _command_column_width()
+    command_lines = _build_command_lines(width)
+    lines.extend(command_lines)
 
     option_label = "-h, --help"
     lines.extend(
@@ -611,6 +619,19 @@ def _command_display(entry: dict[str, Any]) -> str:
     return entry["name"]
 
 
+def _format_command_list() -> str:
+    width = _command_column_width()
+    command_lines = _build_command_lines(width)
+    lines = [ASCII_BANNER, "", "Available commands:", ""]
+    lines.extend(command_lines)
+    if lines and lines[-1] == "":
+        lines.pop()
+    lines.append(
+        "Run 'ecomp <command> --help' for details on a specific command."
+    )
+    return "\n".join(lines)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="ecomp",
@@ -618,10 +639,16 @@ def build_parser() -> argparse.ArgumentParser:
         add_help=False,
     )
     parser.add_argument("-h", "--help", action="help", default=argparse.SUPPRESS)
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
+    parser.add_argument(
+        "--list-commands",
+        action="store_true",
+        help="List available commands and exit",
+    )
     COMMAND_REGISTRY.clear()
     global _COMMAND_COUNTER
     _COMMAND_COUNTER = 0
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command", required=False)
     _add_consensus_sequence_arguments(subparsers)
     _add_column_base_counts_arguments(subparsers)
     _add_gap_fraction_arguments(subparsers)
@@ -926,12 +953,20 @@ def _verify_checksum(sequences: Iterable[str], metadata: dict[str, object]) -> N
 # ---------------------------------------------------------------------------
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: Iterable[str] | None = None) -> int:
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args = parser.parse_args(list(argv) if argv is not None else None)
+
+    if getattr(args, "list_commands", False):
+        print(_format_command_list())
+        return 0
+
     handler = getattr(args, "handler", None)
-    if handler is None:
-        parser.error("No command handler registered")
+    command = getattr(args, "command", None)
+    if command is None or handler is None:
+        parser.print_help()
+        return 0
+
     return handler(args)
 
 

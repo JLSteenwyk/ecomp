@@ -4,7 +4,16 @@ from pathlib import Path
 
 import pytest
 
-from ecomp import __version__, compress_file, decompress_file, eunzip, ezip
+from ecomp import (
+    __version__,
+    compress_file,
+    decompress_file,
+    eunzip,
+    ezip,
+    infer_distance_tree,
+    infer_distance_tree_from_frame,
+    tree_to_newick,
+)
 from ecomp.storage import read_archive, read_metadata, write_archive
 
 
@@ -43,6 +52,12 @@ def test_decompress_file_detects_checksum_mismatch(tmp_path: Path) -> None:
 def test_version_attribute_present() -> None:
     assert isinstance(__version__, str)
     assert __version__
+
+
+def test_phylo_helpers_exposed() -> None:
+    assert callable(infer_distance_tree)
+    assert callable(infer_distance_tree_from_frame)
+    assert callable(tree_to_newick)
 
 
 def test_ezip_eunzip_round_trip(tmp_path: Path) -> None:
